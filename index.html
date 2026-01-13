@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지도 맵</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/cesium@1.113.0/Build/Cesium/Widgets/widgets.css">
+  <script>window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.113.0/Build/Cesium/"</script>
+</head>
+<body>
+  <div id="top-bar">
+    <h1>지도 맵</h1>
+    <label class="mode-switch">
+      <input id="modeSwitch" role="switch" type="checkbox">
+      <span class="ON">3D</span>
+      <span class="OFF">2D</span>
+    </label>
+    <button type="button" onclick="goCity('seoul')" ondblclick="goCityZoom('seoul')">서울</button>
+    <button type="button" onclick="goCity('daegu')" ondblclick="goCityZoom('daegu')">대구</button>
+    <button type="button" onclick="goCity('busan')" ondblclick="goCityZoom('busan')">부산</button>
+    <button type="button" onclick="goCity('jeju')" ondblclick="goCityZoom('jeju')">제주</button>
+    <button id="moveModalBtn" type="button" onclick="openMoveModal()">지도 이동</button>
+    <button id="measureBtn" type="button" onclick="openMeasureModal()">거리 계산</button>
+    <button id="toggleTopbar" type="button" onclick="toggleTopbar()">메뉴 숨기기</button>
+  </div>
+
+  <div id="moveModal" class="modal">
+    <div class="modal_popup">
+      <div id="moveModalHeader" class="modal-header">
+        <h3>지도 이동</h3>
+        <button class="modal-close" onclick="closeMoveModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>좌표:</label>
+          <input type="text" id="inputCoord">
+        </div>
+        <div class="modal-buttons">
+          <button type="button" onclick="moveToCoordinates()">이동</button>
+          <button type="button" onclick="closeMoveModal()">취소</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="measureModal" class="modal">
+    <div class="modal_popup measure-modal-width">
+      <div id="measureModalHeader" class="modal-header">
+        <h3>거리 계산</h3>
+        <button class="modal-close" onclick="closeMeasureModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="measure-results">
+          결과가 여기에 표시됩니다.
+        </div>
+        <div class="modal-buttons">
+          <button type="button" onclick="startMeasure()">측정 시작</button>
+          <button type="button" onclick="clearMeasures()">전체 삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+  <div id="cesiumContainer"></div>
+  
+  <div id="popup" class="ol-popup">
+    <div id="popup-content"></div>
+  </div>
+
+  <div id="bottom-info">
+    <span id="coord-info">위치: 0 , 0</span>
+    <span id="level-info">줌 레벨: 0</span>
+  </div>
+
+  <button id="showTopbar" class="show-topbar-btn" onclick="toggleTopbar()">메뉴 보이기</button>
+  
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.113.0/Build/Cesium/Cesium.js"></script>
+  <script type="text/javascript" src="script.js"></script>
+</body>
+</html>

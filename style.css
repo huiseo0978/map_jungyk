@@ -1,0 +1,249 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Pretendard', sans-serif;
+}
+
+#top-bar {
+  height: 50px;
+  background: #007bff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  z-index: 100;
+  position: relative;
+}
+
+#top-bar h1 {
+  font-size: 1.1rem;
+  margin-right: auto;
+}
+
+#top-bar button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+#top-bar button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+#map, #cesiumContainer {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  width: 100%;
+  bottom: 0;
+}
+
+#cesiumContainer {
+  display: none;
+}
+
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  position: relative;
+}
+
+.mode-switch input {
+  width: 50px;
+  height: 24px;
+  appearance: none;
+  background: #ccc;
+  border-radius: 15px;
+  position: relative;
+  cursor: pointer;
+  transition: 0.3s;
+  z-index: 1;
+}
+
+.mode-switch input:checked {
+  background: #4cd964;
+}
+
+.mode-switch input::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 3px;
+  transition: 0.3s;
+}
+
+.mode-switch input:checked::before {
+  left: 28px;
+}
+
+.ON, .OFF {
+  position: absolute;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ON { left: 8px; opacity: 0; }
+.OFF { right: 8px; opacity: 1; }
+.mode-switch input:checked ~ .ON { opacity: 1; }
+.mode-switch input:checked ~ .OFF { opacity: 0; }
+
+body.topbar-hidden #top-bar { display: none; }
+body.topbar-hidden #map, body.topbar-hidden #cesiumContainer { top: 0; }
+
+.show-topbar-btn {
+  display: none;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1001;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#bottom-info {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 25px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  gap: 20px;
+  font-size: 12px;
+  z-index: 200;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.modal_popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  width: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.measure-modal-width {
+  width: 250px;
+}
+
+.modal-header {
+  background: #007bff;
+  color: #fff;
+  padding: 10px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+}
+
+.modal-header h3 { font-size: 16px; margin: 0; }
+.modal-close { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+
+.modal-body { padding: 15px; }
+.input-group { display: flex; flex-direction: column; gap: 5px; }
+.modal-buttons { margin-top: 15px; display: flex; gap: 8px; justify-content: flex-end; }
+.modal-buttons button { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
+
+#measure-results {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.measure-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.measure-text { cursor: pointer; color: #007bff; text-decoration: underline; }
+.measure-delete { cursor: pointer; color: #dc3545; font-size: 11px; font-weight: bold; }
+
+.ol-tooltip {
+  position: relative;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  color: white;
+  padding: 4px 8px;
+  opacity: 0.8;
+  white-space: nowrap;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.ol-tooltip-static {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid white;
+}
+
+.ol-popup {
+  position: absolute;
+  background: #fff;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  bottom: 15px;
+  left: -50px;
+  min-width: 100px;
+  text-align: center;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.cesium-selection-wrapper {
+  display: none !important;
+}
+
+.cesium-selection-wrapper .cesium-selection-wrapper {
+  display: none !important;
+}
