@@ -17,6 +17,7 @@
       <span class="ON">3D</span>
       <span class="OFF">2D</span>
     </label>
+    <button id="centerBtn" type="button" onclick="moveToCenter()">중심이동</button>
     <button type="button" onclick="goCity('seoul')" ondblclick="goCityZoom('seoul')">서울</button>
     <button type="button" onclick="goCity('daegu')" ondblclick="goCityZoom('daegu')">대구</button>
     <button type="button" onclick="goCity('busan')" ondblclick="goCityZoom('busan')">부산</button>
@@ -34,8 +35,12 @@
       </div>
       <div class="modal-body">
         <div class="input-group">
-          <label>좌표:</label>
-          <input type="text" id="inputCoord">
+          <label>경도:</label>
+          <input type="number" id="inputLongitude" step="0.01" min="-180" max="180">
+        </div>
+        <div class="input-group">
+          <label>위도:</label>
+          <input type="number" id="inputLatitude" step="0.01" min="-90" max="90">
         </div>
         <div class="modal-buttons">
           <button type="button" onclick="moveToCoordinates()">이동</button>

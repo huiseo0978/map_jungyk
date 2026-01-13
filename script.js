@@ -117,6 +117,7 @@ let is3DModeActive = false;
 let cesiumViewer = null;
 let cesiumCityEntitiesArray = [];
 let cesiumActiveMarker = null;
+let cesiumEventHandler = null;
 
 const popupElement = document.getElementById("popup");
 const cityPopup = new ol.Overlay({
@@ -330,7 +331,6 @@ function openMeasureModal() {
     if (measureModalElement) {
         measureModalElement.style.display = "block";
     }
-    openMoveModal();
     setTimeout(function() {
         makeModalDraggable();
     }, 10);
@@ -603,20 +603,9 @@ function startMeasure3D() {
         handleMeasureClick3DFunction(clickEvent);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     
-    const positionsArray = [];
     cesiumMeasurePolylineEntity = cesiumViewer.entities.add({
         polyline: {
-            positions: new Cesium.CallbackProperty(function() {
-                positionsArray.length = 0;
-                for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
-                    const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
-                    if (currentEntity) {
-                        const entityPosition = currentEntity.position.getValue();
-                        positionsArray.push(entityPosition);
-                    }
-                }
-                return positionsArray;
-            }, false),
+            positions: [],
             width: 3,
             material: Cesium.Color.BLUE.withAlpha(0.4),
             clampToGround: true
@@ -708,12 +697,25 @@ function finishMeasure2DFunction() {
             pointsArrayCopy.push(pointLonLat);
         }
         
+        let savedLineFeatureForResult = null;
+        if (measureCurrentLineFeature) {
+            savedLineFeatureForResult = measureCurrentLineFeature;
+        }
+        
+        const savedPointFeaturesArray = [];
+        for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
+            const currentPointFeature = measurePointFeaturesArray[pointIndex];
+            if (currentPointFeature) {
+                savedPointFeaturesArray.push(currentPointFeature);
+            }
+        }
+        
         lastMeasureResult = {
             id: resultId,
             text: distanceText,
             coord: lastPointLonLat,
-            feature: null,
-            pointFeatures: null,
+            feature: savedLineFeatureForResult,
+            pointFeatures: savedPointFeaturesArray,
             pointsArray: pointsArrayCopy,
             isPoint: false
         };
@@ -721,14 +723,7 @@ function finishMeasure2DFunction() {
         measureResultsArray.push(lastMeasureResult);
         updateMeasureListFunction();
         
-        for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
-            const currentPointFeature = measurePointFeaturesArray[pointIndex];
-            if (currentPointFeature) {
-                measureSource.removeFeature(currentPointFeature);
-            }
-        }
         if (measureCurrentLineFeature) {
-            measureSource.removeFeature(measureCurrentLineFeature);
             measureCurrentLineFeature = null;
         }
         if (measureTooltipOverlayElement) {
@@ -740,27 +735,6 @@ function finishMeasure2DFunction() {
         if (measureTooltipOverlay) {
             map.removeOverlay(measureTooltipOverlay);
             measureTooltipOverlay = null;
-        }
-        
-        const allFeaturesArray = measureSource.getFeatures();
-        for (let featureIndex = allFeaturesArray.length - 1; featureIndex >= 0; featureIndex = featureIndex - 1) {
-            const currentFeature = allFeaturesArray[featureIndex];
-            let shouldKeep = false;
-            
-            if (currentFeature === measureCurrentLineFeature) {
-                shouldKeep = true;
-            } else {
-                for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
-                    if (currentFeature === measurePointFeaturesArray[pointIndex]) {
-                        shouldKeep = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (shouldKeep === false) {
-                measureSource.removeFeature(currentFeature);
-            }
         }
         
         if (activeMarker) {
@@ -817,12 +791,25 @@ function finishMeasure3DFunction() {
             pointsArrayCopy.push([currentPoint[0], currentPoint[1]]);
         }
         
+        let savedPolylineEntityForResult = null;
+        if (cesiumMeasurePolylineEntity) {
+            savedPolylineEntityForResult = cesiumMeasurePolylineEntity;
+        }
+        
+        const savedPointEntitiesArray = [];
+        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
+            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
+            if (currentEntity) {
+                savedPointEntitiesArray.push(currentEntity);
+            }
+        }
+        
         lastMeasureResult = {
             id: resultId,
             text: distanceText,
             coord: lastLonLat,
-            feature: null,
-            pointEntities: null,
+            feature: savedPolylineEntityForResult,
+            pointEntities: savedPointEntitiesArray,
             pointsArray: pointsArrayCopy,
             isPoint: false
         };
@@ -830,47 +817,12 @@ function finishMeasure3DFunction() {
         measureResultsArray.push(lastMeasureResult);
         updateMeasureListFunction();
         
-        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
-            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
-            if (currentEntity) {
-                cesiumViewer.entities.remove(currentEntity);
-            }
-        }
         if (cesiumMeasurePolylineEntity) {
-            cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
             cesiumMeasurePolylineEntity = null;
         }
         if (cesiumMeasureTooltipLabel) {
             cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
             cesiumMeasureTooltipLabel = null;
-        }
-        
-        const allEntitiesArray = cesiumViewer.entities.values;
-        const entitiesToKeepArray = [];
-        for (let measureIndex = 0; measureIndex < cesiumMeasureEntitiesArray.length; measureIndex = measureIndex + 1) {
-            entitiesToKeepArray.push(cesiumMeasureEntitiesArray[measureIndex]);
-        }
-        if (cesiumMeasurePolylineEntity) {
-            entitiesToKeepArray.push(cesiumMeasurePolylineEntity);
-        }
-        if (cesiumMeasureTooltipLabel) {
-            entitiesToKeepArray.push(cesiumMeasureTooltipLabel);
-        }
-        
-        for (let entityIndex = allEntitiesArray.length - 1; entityIndex >= 0; entityIndex = entityIndex - 1) {
-            const currentEntity = allEntitiesArray[entityIndex];
-            let shouldKeep = false;
-            
-            for (let keepIndex = 0; keepIndex < entitiesToKeepArray.length; keepIndex = keepIndex + 1) {
-                if (currentEntity === entitiesToKeepArray[keepIndex]) {
-                    shouldKeep = true;
-                    break;
-                }
-            }
-            
-            if (shouldKeep === false) {
-                cesiumViewer.entities.remove(currentEntity);
-            }
         }
         
         if (activeMarker) {
@@ -929,6 +881,20 @@ function handleMeasureClick3DFunction(clickEvent) {
         }
     });
     cesiumMeasureEntitiesArray.push(pointEntity);
+    
+    if (cesiumMeasureEntitiesArray.length >= 2) {
+        const positionsArray = [];
+        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
+            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
+            if (currentEntity) {
+                const entityPosition = currentEntity.position.getValue();
+                positionsArray.push(entityPosition);
+            }
+        }
+        if (cesiumMeasurePolylineEntity && cesiumMeasurePolylineEntity.polyline) {
+            cesiumMeasurePolylineEntity.polyline.positions = positionsArray;
+        }
+    }
     
     let displayText = "";
     if (cesiumMeasureEntitiesArray.length >= 2) {
@@ -1062,20 +1028,6 @@ function updateMeasureListFunction() {
         measureItemDiv.appendChild(measureTextSpan);
         measureItemDiv.appendChild(measureDeleteSpan);
         
-        if (!currentResultItem.isPoint && lastMeasureResult !== null && currentResultItem.id === lastMeasureResult.id) {
-            const continueMeasureSpan = document.createElement("span");
-            continueMeasureSpan.className = "measure-continue";
-            continueMeasureSpan.textContent = "마커 추가";
-            continueMeasureSpan.style.marginLeft = "10px";
-            continueMeasureSpan.style.cursor = "pointer";
-            continueMeasureSpan.style.color = "#007bff";
-            continueMeasureSpan.style.textDecoration = "underline";
-            continueMeasureSpan.onclick = function() {
-                continueMeasureFromResult(currentResultItem.id);
-            };
-            measureItemDiv.appendChild(continueMeasureSpan);
-        }
-        
         resultsContainer.appendChild(measureItemDiv);
     }
 }
@@ -1086,18 +1038,34 @@ function goToMeasureEndPoint(targetResultId) {
         if (currentItem.id === targetResultId) {
             moveMap(currentItem.coord, 15);
             setMarker(currentItem.coord);
-            if (activeMarker) {
-                blinkMarker(activeMarker, redMarkerStyle);
-                setTimeout(function() {
-                    if (activeMarker) {
-                        citySource.removeFeature(activeMarker);
-                        activeMarker = null;
-                    }
-                    if (markerBlinker) {
-                        clearInterval(markerBlinker);
-                        markerBlinker = null;
-                    }
-                }, 5000);
+            if (is3DModeActive) {
+                if (cesiumActiveMarker) {
+                    blinkMarker(null, null);
+                    setTimeout(function() {
+                        if (cesiumActiveMarker) {
+                            cesiumViewer.entities.remove(cesiumActiveMarker);
+                            cesiumActiveMarker = null;
+                        }
+                        if (markerBlinker) {
+                            clearInterval(markerBlinker);
+                            markerBlinker = null;
+                        }
+                    }, 5000);
+                }
+            } else {
+                if (activeMarker) {
+                    blinkMarker(activeMarker, redMarkerStyle);
+                    setTimeout(function() {
+                        if (activeMarker) {
+                            citySource.removeFeature(activeMarker);
+                            activeMarker = null;
+                        }
+                        if (markerBlinker) {
+                            clearInterval(markerBlinker);
+                            markerBlinker = null;
+                        }
+                    }, 5000);
+                }
             }
             break;
         }
@@ -1311,16 +1279,35 @@ function removeMeasureItem(targetResultId) {
                     }
                 }
                 
-                if (activeMarker) {
-                    const markerCoord = ol.proj.toLonLat(activeMarker.getGeometry().getCoordinates());
-                    const coordDiffLon = Math.abs(markerCoord[0] - currentItem.coord[0]);
-                    const coordDiffLat = Math.abs(markerCoord[1] - currentItem.coord[1]);
-                    if (coordDiffLon < 0.0001 && coordDiffLat < 0.0001) {
-                        citySource.removeFeature(activeMarker);
-                        activeMarker = null;
-                        if (markerBlinker) {
-                            clearInterval(markerBlinker);
-                            markerBlinker = null;
+                if (is3DModeActive) {
+                    if (cesiumActiveMarker) {
+                        const markerPosition = cesiumActiveMarker.position.getValue();
+                        const markerCartographic = Cesium.Cartographic.fromCartesian(markerPosition);
+                        const markerLon = Cesium.Math.toDegrees(markerCartographic.longitude);
+                        const markerLat = Cesium.Math.toDegrees(markerCartographic.latitude);
+                        const coordDiffLon = Math.abs(markerLon - currentItem.coord[0]);
+                        const coordDiffLat = Math.abs(markerLat - currentItem.coord[1]);
+                        if (coordDiffLon < 0.0001 && coordDiffLat < 0.0001) {
+                            cesiumViewer.entities.remove(cesiumActiveMarker);
+                            cesiumActiveMarker = null;
+                            if (markerBlinker) {
+                                clearInterval(markerBlinker);
+                                markerBlinker = null;
+                            }
+                        }
+                    }
+                } else {
+                    if (activeMarker) {
+                        const markerCoord = ol.proj.toLonLat(activeMarker.getGeometry().getCoordinates());
+                        const coordDiffLon = Math.abs(markerCoord[0] - currentItem.coord[0]);
+                        const coordDiffLat = Math.abs(markerCoord[1] - currentItem.coord[1]);
+                        if (coordDiffLon < 0.0001 && coordDiffLat < 0.0001) {
+                            citySource.removeFeature(activeMarker);
+                            activeMarker = null;
+                            if (markerBlinker) {
+                                clearInterval(markerBlinker);
+                                markerBlinker = null;
+                            }
                         }
                     }
                 }
@@ -1540,12 +1527,22 @@ function handleMoveMapClick2D(event) {
     const clickedLonLat = ol.proj.toLonLat(clickedCoordinate);
     moveMap(clickedLonLat);
     setMarker(clickedLonLat);
-    if (activeMarker) {
-        blinkMarker(activeMarker, redMarkerStyle);
+    if (is3DModeActive) {
+        if (cesiumActiveMarker) {
+            blinkMarker(null, null);
+        }
+    } else {
+        if (activeMarker) {
+            blinkMarker(activeMarker, redMarkerStyle);
+        }
     }
-    const inputCoordElement = document.getElementById("inputCoord");
-    if (inputCoordElement) {
-        inputCoordElement.value = clickedLonLat[0].toFixed(4) + "," + clickedLonLat[1].toFixed(4);
+    const inputLongitudeElement = document.getElementById("inputLongitude");
+    const inputLatitudeElement = document.getElementById("inputLatitude");
+    if (inputLongitudeElement) {
+        inputLongitudeElement.value = clickedLonLat[0].toFixed(2);
+    }
+    if (inputLatitudeElement) {
+        inputLatitudeElement.value = clickedLonLat[1].toFixed(2);
     }
 }
 
@@ -1578,35 +1575,99 @@ function handleMoveMapClick3D(clickEvent) {
             blinkMarker(activeMarker, redMarkerStyle);
         }
     }
-    const inputCoordElement = document.getElementById("inputCoord");
-    if (inputCoordElement) {
-        inputCoordElement.value = longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
+    const inputLongitudeElement = document.getElementById("inputLongitude");
+    const inputLatitudeElement = document.getElementById("inputLatitude");
+    if (inputLongitudeElement) {
+        inputLongitudeElement.value = longitudeDegrees.toFixed(2);
+    }
+    if (inputLatitudeElement) {
+        inputLatitudeElement.value = latitudeDegrees.toFixed(2);
     }
 }
 
 function moveToCoordinates() {
-    const inputCoordElement = document.getElementById("inputCoord");
-    let inputValue = "";
-    if (inputCoordElement) {
-        inputValue = inputCoordElement.value;
+    const inputLongitudeElement = document.getElementById("inputLongitude");
+    const inputLatitudeElement = document.getElementById("inputLatitude");
+    let longitudeValue = 0;
+    let latitudeValue = 0;
+    if (inputLongitudeElement) {
+        longitudeValue = parseFloat(inputLongitudeElement.value);
     }
-    const inputParts = inputValue.split(",");
-    if (inputParts.length < 2) {
-        return;
+    if (inputLatitudeElement) {
+        latitudeValue = parseFloat(inputLatitudeElement.value);
     }
-    const longitudeValue = parseFloat(inputParts[0]);
-    const latitudeValue = parseFloat(inputParts[1]);
     if (isNaN(longitudeValue)) {
         return;
     }
     if (isNaN(latitudeValue)) {
         return;
     }
+    if (longitudeValue < -180) {
+        longitudeValue = -180;
+    }
+    if (longitudeValue > 180) {
+        longitudeValue = 180;
+    }
+    if (latitudeValue < -90) {
+        latitudeValue = -90;
+    }
+    if (latitudeValue > 90) {
+        latitudeValue = 90;
+    }
+    longitudeValue = Math.round(longitudeValue * 100) / 100;
+    latitudeValue = Math.round(latitudeValue * 100) / 100;
+    
+    if (inputLongitudeElement) {
+        if (longitudeValue < -180) {
+            inputLongitudeElement.value = -180;
+            longitudeValue = -180;
+        } else if (longitudeValue > 180) {
+            inputLongitudeElement.value = 180;
+            longitudeValue = 180;
+        } else {
+            inputLongitudeElement.value = longitudeValue.toFixed(2);
+        }
+    }
+    if (inputLatitudeElement) {
+        if (latitudeValue < -90) {
+            inputLatitudeElement.value = -90;
+            latitudeValue = -90;
+        } else if (latitudeValue > 90) {
+            inputLatitudeElement.value = 90;
+            latitudeValue = 90;
+        } else {
+            inputLatitudeElement.value = latitudeValue.toFixed(2);
+        }
+    }
+    
     const coordinateArray = [longitudeValue, latitudeValue];
     moveMap(coordinateArray);
     setMarker(coordinateArray);
-    if (activeMarker) {
-        blinkMarker(activeMarker, redMarkerStyle);
+    if (is3DModeActive) {
+        if (cesiumActiveMarker) {
+            blinkMarker(null, null);
+        }
+    } else {
+        if (activeMarker) {
+            blinkMarker(activeMarker, redMarkerStyle);
+        }
+    }
+}
+
+function moveToCenter() {
+    const centerLongitude = 127.77;
+    const centerLatitude = 36.34;
+    const centerCoordinateArray = [centerLongitude, centerLatitude];
+    moveMap(centerCoordinateArray);
+    setMarker(centerCoordinateArray);
+    if (is3DModeActive) {
+        if (cesiumActiveMarker) {
+            blinkMarker(null, null);
+        }
+    } else {
+        if (activeMarker) {
+            blinkMarker(activeMarker, redMarkerStyle);
+        }
     }
 }
 
@@ -1689,24 +1750,77 @@ map.on("dblclick", function(event) {
 
 function toggle3D(is3DEnabled) {
     is3DModeActive = is3DEnabled;
+    const mapElement = document.getElementById("map");
+    const cesiumContainerElement = document.getElementById("cesiumContainer");
+
     if (is3DEnabled) {
         if (cesiumViewer === null) {
-            Cesium.Ion.defaultAccessToken = '';
-            const osmImageryProvider = new Cesium.OpenStreetMapImageryProvider({
-                url: "https://tile.openstreetmap.org/"
-            });
-            osmImageryProvider.errorEvent.addEventListener(function(error) {
-            });
-            const cesiumBaseLayer = new Cesium.ImageryLayer(osmImageryProvider);
+            Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NjI0YTQwNC0wMTYyLTQ4N2EtOTMzZi01OTE5OGUxOTc1NGEiLCJpZCI6Mzc3OTMzLCJpYXQiOjE3NjgyODU3NTF9.PKa3bqkvaE_GoFPI7HK9a3bONYA5A5fQjjJuq-pnyXE';
+
             cesiumViewer = new Cesium.Viewer("cesiumContainer", {
-                baseLayer: cesiumBaseLayer,
                 geocoder: false,
                 animation: false,
                 timeline: false,
                 infoBox: false,
                 baseLayerPicker: false,
-                selectionIndicator: false
+                selectionIndicator: false,
+                terrainProvider: new Cesium.EllipsoidTerrainProvider()
             });
+            
+            try {
+                if (typeof Cesium.IonImageryProvider !== 'undefined' && typeof Cesium.IonImageryProvider.fromAssetId === 'function') {
+                    Cesium.IonImageryProvider.fromAssetId(2).then(function(provider) {
+                        if (cesiumViewer && !cesiumViewer.isDestroyed()) {
+                            cesiumViewer.imageryLayers.removeAll();
+                            cesiumViewer.imageryLayers.addImageryProvider(provider);
+                        }
+                    }).catch(function(error) {
+                        console.log("Ion imagery from asset ID failed:", error);
+                    });
+                }
+            } catch (error) {
+                console.log("Ion imagery setup failed:", error);
+            }
+
+            try {
+                if (typeof Cesium.CesiumTerrainProvider.fromIonAssetId === 'function') {
+                    Cesium.CesiumTerrainProvider.fromIonAssetId(1).then(function(provider) {
+                        if (cesiumViewer && !cesiumViewer.isDestroyed()) {
+                            cesiumViewer.terrainProvider = provider;
+                            console.log("World Terrain loaded successfully");
+                        }
+                    }).catch(function(err) {
+                        console.error("Failed to load World Terrain:", err);
+                    });
+                } else {
+                    console.log("CesiumTerrainProvider.fromIonAssetId not available");
+                }
+            } catch (e) {
+                console.error("Error setting up terrain:", e);
+            }
+
+            try {
+                if (typeof Cesium.createOsmBuildings === 'function') {
+                    const osmBuildings = Cesium.createOsmBuildings();
+                    cesiumViewer.scene.primitives.add(osmBuildings);
+                    console.log("OSM Buildings added successfully");
+                } else {
+                    console.log("Cesium.createOsmBuildings not available");
+                }
+            } catch (e) {
+                console.error("Error adding OSM Buildings:", e);
+            }
+
+            const initialCenter = [127.0276, 37.4979];
+            cesiumViewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(initialCenter[0], initialCenter[1], 15000),
+                orientation: {
+                    heading: Cesium.Math.toRadians(0),
+                    pitch: Cesium.Math.toRadians(-45),
+                    roll: 0.0
+                }
+            });
+            
             cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
             if (cesiumViewer.selectionIndicator) {
                 cesiumViewer.selectionIndicator.viewModel.selectionIndicatorElement.style.display = 'none';
@@ -1719,7 +1833,7 @@ function toggle3D(is3DEnabled) {
                     levelInfoElement.innerText = "높이: " + roundedHeight + "m";
                 }
             });
-            const cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
+            cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
             cesiumEventHandler.setInputAction(function(movementEvent) {
                 const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
                 if (pickedCartesian) {
@@ -1757,9 +1871,93 @@ function toggle3D(is3DEnabled) {
                                         if (popupElement) {
                                             const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
                                             if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
                                                 popupElement.style.left = screenPosition.x + 'px';
                                                 popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
                                                 popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
+                                            }
+                                        }
+                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                        if (cesiumCanvasElement) {
+                                            cesiumCanvasElement.style.cursor = 'pointer';
+                                        }
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (foundCityEntity === false) {
+                        if (popupElement) {
+                            popupElement.style.display = 'none';
+                        }
+                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                        if (cesiumCanvasElement) {
+                            cesiumCanvasElement.style.cursor = '';
+                        }
+                    }
+                }
+            }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+            cesiumEventHandler.setInputAction(function(clickEvent) {
+                if (isMeasuringNow) {
+                    finishMeasureFunction();
+                } else {
+                    if (document.body.classList.contains("topbar-hidden")) {
+                        window.toggleTopbar();
+                    }
+                }
+            }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+        } else {
+            if (cesiumEventHandler === null) {
+                cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
+            }
+            cesiumEventHandler.setInputAction(function(movementEvent) {
+                const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
+                if (pickedCartesian) {
+                    const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
+                    const longitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.longitude);
+                    const latitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.latitude);
+                    const coordinateInfoElement = document.getElementById("coord-info");
+                    if (coordinateInfoElement) {
+                        coordinateInfoElement.innerText = "위치: " + longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
+                    }
+                }
+                
+                if (isMeasuringNow === false) {
+                    const pickedObject = cesiumViewer.scene.pick(movementEvent.endPosition);
+                    const popupContentElement = document.getElementById("popup-content");
+                    const popupElement = document.getElementById("popup");
+                    let foundCityEntity = false;
+                    if (pickedObject && pickedObject.id) {
+                        const pickedEntity = pickedObject.id;
+                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                            if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
+                                foundCityEntity = true;
+                                const cityKeysArray = Object.keys(cityInfos);
+                                for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
+                                    const cityKey = cityKeysArray[keyIndex];
+                                    const cityData = cityInfos[cityKey];
+                                    const pickedPosition = pickedEntity.position.getValue();
+                                    const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
+                                    const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
+                                    const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
+                                    if (positionDistance < 100) {
+                                        if (popupContentElement) {
+                                            popupContentElement.innerHTML = cityData.name;
+                                        }
+                                        if (popupElement) {
+                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                            if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
+                                                popupElement.style.left = screenPosition.x + 'px';
+                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
+                                                popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
                                             }
                                         }
                                         const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -1835,24 +2033,23 @@ function toggle3D(is3DEnabled) {
                 cesiumCityEntitiesArray.push(cityEntityForCesium);
             }
         }
-        const mapElement = document.getElementById("map");
+    }
+    
+    if (is3DEnabled) {
         if (mapElement) {
             mapElement.style.display = "none";
         }
-        const cesiumContainerElement = document.getElementById("cesiumContainer");
         if (cesiumContainerElement) {
             cesiumContainerElement.style.display = "block";
         }
     } else {
-        const cesiumContainerElement = document.getElementById("cesiumContainer");
         if (cesiumContainerElement) {
             cesiumContainerElement.style.display = "none";
         }
-        const mapElement = document.getElementById("map");
         if (mapElement) {
             mapElement.style.display = "block";
+            map.updateSize();
         }
-        map.updateSize();
     }
 }
 
@@ -1861,6 +2058,82 @@ if (modeSwitch) {
     modeSwitch.onchange = function() {
         toggle3D(this.checked);
     };
+}
+
+const inputLongitudeElement = document.getElementById("inputLongitude");
+if (inputLongitudeElement) {
+    inputLongitudeElement.addEventListener("input", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -180) {
+                this.value = -180;
+            } else if (currentValue > 180) {
+                this.value = 180;
+            }
+        }
+    });
+    inputLongitudeElement.addEventListener("change", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -180) {
+                this.value = -180;
+            } else if (currentValue > 180) {
+                this.value = 180;
+            } else {
+                this.value = Math.round(currentValue * 100) / 100;
+            }
+        }
+    });
+    inputLongitudeElement.addEventListener("blur", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -180) {
+                this.value = -180;
+            } else if (currentValue > 180) {
+                this.value = 180;
+            } else {
+                this.value = Math.round(currentValue * 100) / 100;
+            }
+        }
+    });
+}
+
+const inputLatitudeElement = document.getElementById("inputLatitude");
+if (inputLatitudeElement) {
+    inputLatitudeElement.addEventListener("input", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -90) {
+                this.value = -90;
+            } else if (currentValue > 90) {
+                this.value = 90;
+            }
+        }
+    });
+    inputLatitudeElement.addEventListener("change", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -90) {
+                this.value = -90;
+            } else if (currentValue > 90) {
+                this.value = 90;
+            } else {
+                this.value = Math.round(currentValue * 100) / 100;
+            }
+        }
+    });
+    inputLatitudeElement.addEventListener("blur", function() {
+        let currentValue = parseFloat(this.value);
+        if (!isNaN(currentValue)) {
+            if (currentValue < -90) {
+                this.value = -90;
+            } else if (currentValue > 90) {
+                this.value = 90;
+            } else {
+                this.value = Math.round(currentValue * 100) / 100;
+            }
+        }
+    });
 }
 
 window.goCity = function(cityName) {
@@ -1903,6 +2176,7 @@ window.closeMoveModal = closeMoveModal;
 window.openMeasureModal = openMeasureModal;
 window.closeMeasureModal = closeMeasureModal;
 window.moveToCoordinates = moveToCoordinates;
+window.moveToCenter = moveToCenter;
 window.startMeasure = startMeasure;
 window.clearMeasures = clearMeasures;
 window.goToMeasureEndPoint = goToMeasureEndPoint;
