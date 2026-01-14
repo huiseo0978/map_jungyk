@@ -67,9 +67,6 @@ const map = new ol.Map({
     view: mainView
 });
 
-// 측정 레이어 기본 숨김 (모달 열 때만 보이게)
-measureLayer.setVisible(false);
-
 const doubleClickZoomInteraction = map.getInteractions().getArray().find(function(interaction) {
     return interaction instanceof ol.interaction.DoubleClickZoom;
 });
@@ -241,8 +238,7 @@ function setMarker(lonlat) {
                     color: Cesium.Color.RED,
                     outlineColor: Cesium.Color.WHITE,
                     outlineWidth: 3,
-                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
                 }
             });
         }
@@ -342,76 +338,7 @@ let cesiumAreaClickHandler = null;
 let cesiumAreaTooltipLabel = null;
 let lastAreaResult = null;
 
-// ===============================
-// 거리/면적 결과 표시(보이기/숨기기)
-// - 모달이 열려 있을 때만 라인/폴리곤 보이게
-// ===============================
-let isMeasureModalOpen = false;
-let isAreaModalOpen = false;
-let isTabExampleModalOpen = false;
-
-function setMeasurementGraphicsVisible(isVisible) {
-    if (is3DModeActive) {
-        if (cesiumViewer) {
-            for (let i = 0; i < measureResultsArray.length; i = i + 1) {
-                const item = measureResultsArray[i];
-                if (item && item.feature && typeof item.feature.show !== "undefined") {
-                    item.feature.show = isVisible;
-                }
-                if (item && item.pointEntities) {
-                    for (let j = 0; j < item.pointEntities.length; j = j + 1) {
-                        const ent = item.pointEntities[j];
-                        if (ent && typeof ent.show !== "undefined") {
-                            ent.show = isVisible;
-                        }
-                    }
-                }
-            }
-            for (let k = 0; k < areaResultsArray.length; k = k + 1) {
-                const item = areaResultsArray[k];
-                if (item && item.feature && typeof item.feature.show !== "undefined") {
-                    item.feature.show = isVisible;
-                }
-                if (item && item.pointEntities) {
-                    for (let m = 0; m < item.pointEntities.length; m = m + 1) {
-                        const ent = item.pointEntities[m];
-                        if (ent && typeof ent.show !== "undefined") {
-                            ent.show = isVisible;
-                        }
-                    }
-                }
-            }
-        }
-        return;
-    }
-
-    // 2D는 측정 레이어 자체를 숨기는 게 가장 깔끔함
-    if (measureLayer && typeof measureLayer.setVisible === "function") {
-        measureLayer.setVisible(isVisible);
-    }
-}
-
-function updateMeasurementGraphicsVisibility() {
-    const shouldShow = isMeasureModalOpen || isAreaModalOpen || isTabExampleModalOpen;
-    setMeasurementGraphicsVisible(shouldShow);
-}
-
-
-let isMeasurePanelOpen = false;
-let isMeasureGraphicsVisible = true;
-
-
 function openMeasureModal() {
-    isMeasurePanelOpen = true;
-    showMeasurementGraphicsIfNeeded();
-
-    const tabExampleModalDiv = document.getElementById("tabExampleModal");
-    if (tabExampleModalDiv != null) {
-        openTabExampleModal();
-        switchTab("distance");
-        return;
-    }
-
     const measureModalElement = document.getElementById("measureModal");
     if (measureModalElement) {
         measureModalElement.style.display = "block";
@@ -421,23 +348,13 @@ function openMeasureModal() {
     }, 10);
 }
 
-
 function closeMeasureModal() {
-    const tabExampleModalDiv = document.getElementById("tabExampleModal");
-    if (tabExampleModalDiv != null && tabExampleModalDiv.style.display === "block") {
-        closeTabExampleModal();
-        return;
-    }
-
     const measureModalElement = document.getElementById("measureModal");
     if (measureModalElement) {
         measureModalElement.style.display = "none";
     }
     stopMeasureFunction();
-    isMeasurePanelOpen = false;
-    hideMeasurementGraphicsIfNeeded();
 }
-
 
 function stopMeasureFunction() {
     isMeasuringNow = false;
@@ -449,14 +366,6 @@ function stopMeasureFunction() {
     }
     
     measurePointsArray = [];
-
-    for (let i = measureResultsArray.length - 1; i >= 0; i = i - 1) {
-        const item = measureResultsArray[i];
-        if (item && item.isPoint) {
-            measureResultsArray.splice(i, 1);
-        }
-    }
-    updateMeasureListFunction();
 }
 
 function stopMeasure2DFunction() {
@@ -518,11 +427,7 @@ function stopMeasure3DFunction() {
             cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
             cesiumMeasurePolylineEntity = null;
         }
-        if (cesiumMeasureTooltipLabel) {
-            cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
-            cesiumMeasureTooltipLabel = null;
-        }
-    }
+}
     cesiumMeasureEntitiesArray = [];
 }
 
@@ -570,8 +475,7 @@ function continueMeasureFromResult(targetResultId) {
                                 color: Cesium.Color.BLUE.withAlpha(0.8),
                                 outlineColor: Cesium.Color.WHITE,
                                 outlineWidth: 2,
-                                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
                             }
                         });
                         cesiumMeasureEntitiesArray.push(pointEntity);
@@ -896,8 +800,14 @@ function finishMeasure3DFunction() {
         }
         
         let savedPolylineEntityForResult = null;
+        let savedLabelEntityForResult = null;
         if (cesiumMeasurePolylineEntity) {
             savedPolylineEntityForResult = cesiumMeasurePolylineEntity;
+            
+            if (cesiumMeasureTooltipLabel) {
+                savedLabelEntityForResult = cesiumMeasureTooltipLabel;
+                cesiumMeasureTooltipLabel = null;
+            }
         }
         
         const savedPointEntitiesArray = [];
@@ -914,6 +824,7 @@ function finishMeasure3DFunction() {
             coord: lastLonLat,
             feature: savedPolylineEntityForResult,
             pointEntities: savedPointEntitiesArray,
+            labelEntity: savedLabelEntityForResult,
             pointsArray: pointsArrayCopy,
             isPoint: false
         };
@@ -955,38 +866,6 @@ function finishMeasure3DFunction() {
     }
 }
 
-function pickCesiumGroundPosition(screenPosition) {
-    if (cesiumViewer === null) {
-        return null;
-    }
-    const scene = cesiumViewer.scene;
-    let picked = null;
-
-    // 1) Terrain/globe intersection (best for "지형" 기준)
-    const ray = cesiumViewer.camera.getPickRay(screenPosition);
-    if (ray) {
-        picked = scene.globe.pick(ray, scene);
-    }
-
-    // 2) Fallback: depth-based pick (works well on 3D Tiles/buildings)
-    if (!picked && scene.pickPositionSupported) {
-        try {
-            picked = scene.pickPosition(screenPosition);
-        } catch (error) {
-            picked = null;
-        }
-    }
-
-    if (!picked) {
-        return null;
-    }
-
-    if (!isFinite(picked.x) || !isFinite(picked.y) || !isFinite(picked.z)) {
-        return null;
-    }
-    return picked;
-}
-
 function handleMeasureClick3DFunction(clickEvent) {
     if (!isMeasuringNow) {
         return;
@@ -995,11 +874,10 @@ function handleMeasureClick3DFunction(clickEvent) {
         return;
     }
     
-    const pickedPosition = pickCesiumGroundPosition(clickEvent.position);
-    if (!pickedPosition) {
+    const pickedPosition = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
+    if (pickedPosition === undefined) {
         return;
     }
-
     
     const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedPosition);
     const longitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.longitude);
@@ -1014,7 +892,6 @@ function handleMeasureClick3DFunction(clickEvent) {
             color: Cesium.Color.BLUE.withAlpha(0.8),
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 2,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
         }
     });
@@ -1464,6 +1341,9 @@ function clearMeasures() {
                 if (currentResult.feature) {
                     cesiumViewer.entities.remove(currentResult.feature);
                 }
+                if (currentResult.labelEntity) {
+                    cesiumViewer.entities.remove(currentResult.labelEntity);
+                }
                 if (currentResult.pointEntities) {
                     for (let pointIndex = 0; pointIndex < currentResult.pointEntities.length; pointIndex = pointIndex + 1) {
                         const currentPointEntity = currentResult.pointEntities[pointIndex];
@@ -1692,11 +1572,10 @@ function handleMoveMapClick3D(clickEvent) {
     if (cesiumViewer === null) {
         return;
     }
-    const pickedPosition = pickCesiumGroundPosition(clickEvent.position);
-    if (!pickedPosition) {
+    const pickedPosition = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
+    if (pickedPosition === undefined) {
         return;
     }
-
     const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedPosition);
     const longitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.longitude);
     const latitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.latitude);
@@ -2152,8 +2031,7 @@ function toggle3D(is3DEnabled) {
                         color: Cesium.Color.fromBytes(0, 123, 255, 255),
                         outlineColor: Cesium.Color.WHITE,
                         outlineWidth: 2,
-                        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
                     },
                     label: {
                         text: cityDataForCesium.name,
@@ -2188,8 +2066,6 @@ function toggle3D(is3DEnabled) {
             map.updateSize();
         }
     }
-
-    updateMeasurementGraphicsVisibility();
 }
 
 const modeSwitch = document.getElementById("modeSwitch");
@@ -2311,16 +2187,6 @@ window.goCityZoom = function(cityName) {
 };
 
 function openAreaModal() {
-    isMeasurePanelOpen = true;
-    showMeasurementGraphicsIfNeeded();
-
-    const tabExampleModalDiv = document.getElementById("tabExampleModal");
-    if (tabExampleModalDiv != null) {
-        openTabExampleModal();
-        switchTab("area");
-        return;
-    }
-
     const areaModalElement = document.getElementById("areaModal");
     if (areaModalElement) {
         areaModalElement.style.display = "block";
@@ -2330,23 +2196,13 @@ function openAreaModal() {
     }, 10);
 }
 
-
 function closeAreaModal() {
-    const tabExampleModalDiv = document.getElementById("tabExampleModal");
-    if (tabExampleModalDiv != null && tabExampleModalDiv.style.display === "block") {
-        closeTabExampleModal();
-        return;
-    }
-
     const areaModalElement = document.getElementById("areaModal");
     if (areaModalElement) {
         areaModalElement.style.display = "none";
     }
     stopAreaMeasureFunction();
-    isMeasurePanelOpen = false;
-    hideMeasurementGraphicsIfNeeded();
 }
-
 
 function stopAreaMeasureFunction() {
     isAreaMeasuringNow = false;
@@ -2358,14 +2214,6 @@ function stopAreaMeasureFunction() {
     }
     
     areaPointsArray = [];
-
-    for (let i = areaResultsArray.length - 1; i >= 0; i = i - 1) {
-        const item = areaResultsArray[i];
-        if (item && item.isPoint) {
-            areaResultsArray.splice(i, 1);
-        }
-    }
-    updateAreaListFunction();
 }
 
 function stopAreaMeasure2DFunction() {
@@ -2413,11 +2261,7 @@ function stopAreaMeasure3DFunction() {
             cesiumViewer.entities.remove(cesiumAreaPolygonEntity);
             cesiumAreaPolygonEntity = null;
         }
-        if (cesiumAreaTooltipLabel) {
-            cesiumViewer.entities.remove(cesiumAreaTooltipLabel);
-            cesiumAreaTooltipLabel = null;
-        }
-    }
+}
     cesiumAreaEntitiesArray = [];
 }
 
@@ -2474,40 +2318,28 @@ function startAreaMeasure3D() {
     if (cesiumViewer === null) {
         return;
     }
-
-    if (cesiumViewer.scene && cesiumViewer.scene.globe) {
-        cesiumViewer.scene.globe.depthTestAgainstTerrain = true;
-    }
-
+    
     const cesiumCanvasElement = cesiumViewer.scene.canvas;
     if (cesiumCanvasElement) {
         cesiumCanvasElement.style.cursor = 'crosshair';
     }
-
+    
     cesiumAreaClickHandler = new Cesium.ScreenSpaceEventHandler(cesiumCanvasElement);
     cesiumAreaClickHandler.setInputAction(function(clickEvent) {
         handleAreaClick3DFunction(clickEvent);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-    const polygonOptions = {
-        hierarchy: new Cesium.PolygonHierarchy([]),
-        material: Cesium.Color.RED.withAlpha(0.3),
-        outline: true,
-        outlineColor: Cesium.Color.RED
-    };
-
-    if (Cesium.HeightReference && Cesium.HeightReference.CLAMP_TO_GROUND) {
-        polygonOptions.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
-    }
-    if (Cesium.ClassificationType && Cesium.ClassificationType.BOTH) {
-        polygonOptions.classificationType = Cesium.ClassificationType.BOTH;
-    }
-
+    
     cesiumAreaPolygonEntity = cesiumViewer.entities.add({
-        polygon: polygonOptions
+        polygon: {
+            hierarchy: [],
+            material: Cesium.Color.RED.withAlpha(0.3),
+            outline: true,
+            outlineColor: Cesium.Color.RED,
+            height: 0,
+            extrudedHeight: 0
+        }
     });
 }
-
 
 function handleAreaClickFunction(event) {
     if (!isAreaMeasuringNow) {
@@ -2564,18 +2396,18 @@ function handleAreaClick3DFunction(clickEvent) {
     if (!isAreaMeasuringNow) {
         return;
     }
-
-    const pickedCartesian = pickCesiumGroundPosition(clickEvent.position);
+    
+    const pickedCartesian = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
     if (!pickedCartesian) {
         return;
     }
-
+    
     const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
     const longitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.longitude);
     const latitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.latitude);
-
+    
     areaPointsArray.push([longitudeDegrees, latitudeDegrees]);
-
+    
     const pointEntity = cesiumViewer.entities.add({
         position: pickedCartesian,
         point: {
@@ -2583,29 +2415,64 @@ function handleAreaClick3DFunction(clickEvent) {
             color: Cesium.Color.RED,
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 2,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
             heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
         }
     });
     cesiumAreaEntitiesArray.push(pointEntity);
-
+    
     let displayText = "";
     if (areaPointsArray.length >= 3) {
         const calculatedArea = calculateCesiumArea();
         displayText = formatCesiumArea(calculatedArea);
-
-        const degreesArray = [];
-        for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
-            const currentPoint = areaPointsArray[pointIndex];
-            degreesArray.push(currentPoint[0], currentPoint[1]);
+        
+        const positionsArray = [];
+        for (let pointIndex = 0; pointIndex < cesiumAreaEntitiesArray.length; pointIndex = pointIndex + 1) {
+            const currentEntity = cesiumAreaEntitiesArray[pointIndex];
+            if (currentEntity) {
+                const currentPosition = currentEntity.position.getValue();
+                positionsArray.push(currentPosition);
+            }
         }
-        const positionsArray = Cesium.Cartesian3.fromDegreesArray(degreesArray);
-
-        if (cesiumAreaPolygonEntity && cesiumAreaPolygonEntity.polygon) {
-            cesiumAreaPolygonEntity.polygon.hierarchy = new Cesium.PolygonHierarchy(positionsArray);
+        if (positionsArray.length > 0) {
+            positionsArray.push(positionsArray[0]);
         }
+        
+        cesiumAreaPolygonEntity.polygon.hierarchy = new Cesium.CallbackProperty(function() {
+            return new Cesium.PolygonHierarchy(positionsArray);
+        }, false);
     } else {
         displayText = longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
+    }
+
+    if (cesiumViewer) {
+        if (areaPointsArray.length >= 3) {
+            const totalAreaNow = calculateCesiumArea();
+            const areaTextNow = formatCesiumArea(totalAreaNow);
+
+            if (cesiumAreaTooltipLabel) {
+                cesiumViewer.entities.remove(cesiumAreaTooltipLabel);
+                cesiumAreaTooltipLabel = null;
+            }
+
+            cesiumAreaTooltipLabel = cesiumViewer.entities.add({
+                position: pickedCartesian,
+                label: {
+                    text: areaTextNow,
+                    font: '12px sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    pixelOffset: new Cesium.Cartesian2(0, -40),
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY
+                }
+            });
+        } else {
+            if (cesiumAreaTooltipLabel) {
+                cesiumViewer.entities.remove(cesiumAreaTooltipLabel);
+                cesiumAreaTooltipLabel = null;
+            }
+        }
     }
 
     const pointResultId = Date.now() + areaPointsArray.length;
@@ -2618,7 +2485,6 @@ function handleAreaClick3DFunction(clickEvent) {
     });
     updateAreaListFunction();
 }
-
 
 function finishAreaMeasureFunction() {
     if (!isAreaMeasuringNow) {
@@ -2745,8 +2611,14 @@ function finishAreaMeasure3DFunction() {
         }
         
         let savedPolygonEntityForResult = null;
+        let savedLabelEntityForResult = null;
         if (cesiumAreaPolygonEntity) {
             savedPolygonEntityForResult = cesiumAreaPolygonEntity;
+            
+            if (cesiumAreaTooltipLabel) {
+                savedLabelEntityForResult = cesiumAreaTooltipLabel;
+                cesiumAreaTooltipLabel = null;
+            }
         }
         
         const savedPointEntitiesArray = [];
@@ -2763,6 +2635,7 @@ function finishAreaMeasure3DFunction() {
             coord: lastLonLat,
             feature: savedPolygonEntityForResult,
             pointEntities: savedPointEntitiesArray,
+            labelEntity: savedLabelEntityForResult,
             pointsArray: pointsArrayCopy,
             isPoint: false
         };
@@ -2886,10 +2759,7 @@ function updateAreaListFunction() {
             } else {
                 htmlContent = htmlContent + "<span class='measure-text' onclick='goToAreaEndPoint(" + currentItem.id + ")'>" + currentItem.text + "</span>";
             }
-            if (!currentItem.isPoint || !isAreaMeasuringNow || areaPointsArray.length >= 3) {
-                htmlContent = htmlContent + "<span class='measure-delete' onclick='removeAreaItem(" + currentItem.id + ")'>삭제</span>";
-            }
-
+            htmlContent = htmlContent + "<span class='measure-delete' onclick='removeAreaItem(" + currentItem.id + ")'>삭제</span>";
             htmlContent = htmlContent + "</div>";
         }
     }
@@ -2910,6 +2780,9 @@ function clearAreas() {
             if (is3DModeActive) {
                 if (currentItem.feature && cesiumViewer) {
                     cesiumViewer.entities.remove(currentItem.feature);
+                }
+                if (currentItem.labelEntity && cesiumViewer) {
+                    cesiumViewer.entities.remove(currentItem.labelEntity);
                 }
                 if (currentItem.pointEntities) {
                     for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
@@ -2948,131 +2821,22 @@ function removeAreaItem(itemId) {
             break;
         }
     }
-
+    
     if (foundIndex === -1) {
         return;
     }
-
+    
     const currentItem = areaResultsArray[foundIndex];
-
-    // 점(포인트) 삭제는 "점 3개 이상" 찍은 이후부터 허용
-    if (currentItem.isPoint) {
-        if (isAreaMeasuringNow && areaPointsArray.length < 3) {
-            alert("점 3개를 찍은 이후부터 삭제할 수 있습니다.");
-            return;
-        }
-
-        // UI 리스트에서 먼저 제거
-        areaResultsArray.splice(foundIndex, 1);
-
-        // 실제 포인트/좌표 배열에서도 제거
-        const removedCoord = currentItem.coord;
-        let removedPointIndex = -1;
-
-        for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
-            if (is3DModeActive) {
-                if (areaPointsArray[pointIndex][0] === removedCoord[0] && areaPointsArray[pointIndex][1] === removedCoord[1]) {
-                    removedPointIndex = pointIndex;
-                    areaPointsArray.splice(pointIndex, 1);
-                    break;
-                }
-            } else {
-                const currentPointLonLat = ol.proj.toLonLat(areaPointsArray[pointIndex]);
-                if (currentPointLonLat[0] === removedCoord[0] && currentPointLonLat[1] === removedCoord[1]) {
-                    removedPointIndex = pointIndex;
-                    areaPointsArray.splice(pointIndex, 1);
-                    break;
-                }
-            }
-        }
-
-        // 지도/3D 엔티티 삭제 및 폴리곤 재연결
-        if (is3DModeActive) {
-            if (cesiumViewer && currentItem.feature) {
-                cesiumViewer.entities.remove(currentItem.feature);
-            }
-
-            if (removedPointIndex >= 0 && removedPointIndex < cesiumAreaEntitiesArray.length) {
-                const removedEntity = cesiumAreaEntitiesArray[removedPointIndex];
-                if (removedEntity && cesiumViewer) {
-                    cesiumViewer.entities.remove(removedEntity);
-                }
-                cesiumAreaEntitiesArray.splice(removedPointIndex, 1);
-            }
-
-            if (cesiumAreaPolygonEntity && cesiumAreaPolygonEntity.polygon) {
-                if (areaPointsArray.length >= 3) {
-                    const positionsArray = [];
-                    for (let entityIndex = 0; entityIndex < cesiumAreaEntitiesArray.length; entityIndex = entityIndex + 1) {
-                        const currentEntity = cesiumAreaEntitiesArray[entityIndex];
-                        if (currentEntity) {
-                            positionsArray.push(currentEntity.position.getValue());
-                        }
-                    }
-                    if (positionsArray.length > 0) {
-                        positionsArray.push(positionsArray[0]);
-                    }
-                    cesiumAreaPolygonEntity.polygon.hierarchy = new Cesium.PolygonHierarchy(positionsArray);
-
-                    const newAreaValue = formatCesiumArea(calculateCesiumArea());
-                    for (let i = areaResultsArray.length - 1; i >= 0; i = i - 1) {
-                        if (areaResultsArray[i].isPoint) {
-                            areaResultsArray[i].text = newAreaValue;
-                            break;
-                        }
-                    }
-                } else {
-                    cesiumAreaPolygonEntity.polygon.hierarchy = new Cesium.PolygonHierarchy([]);
-                }
-            }
-        } else {
-            if (currentItem.feature) {
-                measureSource.removeFeature(currentItem.feature);
-            }
-
-            if (removedPointIndex >= 0 && removedPointIndex < areaPointFeaturesArray.length) {
-                const removedPointFeature = areaPointFeaturesArray[removedPointIndex];
-                if (removedPointFeature) {
-                    measureSource.removeFeature(removedPointFeature);
-                }
-                areaPointFeaturesArray.splice(removedPointIndex, 1);
-            }
-
-            if (areaCurrentPolygonFeature) {
-                if (areaPointsArray.length >= 3) {
-                    const polygonCoordinates = [];
-                    for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
-                        polygonCoordinates.push(areaPointsArray[pointIndex]);
-                    }
-                    polygonCoordinates.push(areaPointsArray[0]);
-
-                    const polygonGeometry = new ol.geom.Polygon([polygonCoordinates]);
-                    areaCurrentPolygonFeature.setGeometry(polygonGeometry);
-
-                    const newAreaValue = formatArea(polygonGeometry);
-                    for (let i = areaResultsArray.length - 1; i >= 0; i = i - 1) {
-                        if (areaResultsArray[i].isPoint) {
-                            areaResultsArray[i].text = newAreaValue;
-                            break;
-                        }
-                    }
-                } else {
-                    areaCurrentPolygonFeature.setGeometry(new ol.geom.Polygon([]));
-                }
-            }
-        }
-
-        updateAreaListFunction();
-        return;
-    }
-
-    // 최종 결과(폴리곤) 삭제
     if (currentItem.feature) {
         if (is3DModeActive) {
-            if (cesiumViewer) {
-                if (currentItem.feature) {
-                    cesiumViewer.entities.remove(currentItem.feature);
-                }
+            if (currentItem.feature && cesiumViewer) {
+                cesiumViewer.entities.remove(currentItem.feature);
+            }
+            if (currentItem.labelEntity && cesiumViewer) {
+                cesiumViewer.entities.remove(currentItem.labelEntity);
+            }
+            if (currentItem.labelEntity && cesiumViewer) {
+                cesiumViewer.entities.remove(currentItem.labelEntity);
             }
             if (currentItem.pointEntities) {
                 for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
@@ -3096,11 +2860,10 @@ function removeAreaItem(itemId) {
             }
         }
     }
-
+    
     areaResultsArray.splice(foundIndex, 1);
     updateAreaListFunction();
 }
-
 
 function goToAreaEndPoint(itemId) {
     let foundItem = null;
@@ -3150,127 +2913,7 @@ window.clearAreas = clearAreas;
 window.removeAreaItem = removeAreaItem;
 window.goToAreaEndPoint = goToAreaEndPoint;
 
-
-function isAnyMeasureUiOpen() {
-    const tabExampleModalDiv = document.getElementById("tabExampleModal");
-    const measureModalElement = document.getElementById("measureModal");
-    const areaModalElement = document.getElementById("areaModal");
-
-    if (tabExampleModalDiv != null && tabExampleModalDiv.style.display === "block") {
-        return true;
-    }
-    if (measureModalElement != null && measureModalElement.style.display === "block") {
-        return true;
-    }
-    if (areaModalElement != null && areaModalElement.style.display === "block") {
-        return true;
-    }
-    return false;
-}
-
-function setMeasurementGraphicsVisible(visible) {
-    isMeasureGraphicsVisible = visible;
-
-    // 2D(OpenLayers)
-    if (measureLayer && typeof measureLayer.setVisible === "function") {
-        measureLayer.setVisible(visible);
-    }
-
-    // 3D(Cesium)
-    if (cesiumViewer) {
-        for (let i = 0; i < measureResultsArray.length; i = i + 1) {
-            const item = measureResultsArray[i];
-            if (!item) {
-                continue;
-            }
-
-            if (item.feature && typeof item.feature.show !== "undefined") {
-                item.feature.show = visible;
-            }
-
-            if (item.pointEntities && Array.isArray(item.pointEntities)) {
-                for (let j = 0; j < item.pointEntities.length; j = j + 1) {
-                    const pointEntity = item.pointEntities[j];
-                    if (pointEntity && typeof pointEntity.show !== "undefined") {
-                        pointEntity.show = visible;
-                    }
-                }
-            }
-
-            // 중간 클릭 결과(점)도 리스트에 남아있을 수 있어서 같이 처리
-            if (item.isPoint && item.feature && typeof item.feature.show !== "undefined") {
-                item.feature.show = visible;
-            }
-        }
-
-        for (let i = 0; i < areaResultsArray.length; i = i + 1) {
-            const item = areaResultsArray[i];
-            if (!item) {
-                continue;
-            }
-
-            if (item.feature && typeof item.feature.show !== "undefined") {
-                item.feature.show = visible;
-            }
-
-            if (item.pointEntities && Array.isArray(item.pointEntities)) {
-                for (let j = 0; j < item.pointEntities.length; j = j + 1) {
-                    const pointEntity = item.pointEntities[j];
-                    if (pointEntity && typeof pointEntity.show !== "undefined") {
-                        pointEntity.show = visible;
-                    }
-                }
-            }
-
-            if (item.isPoint && item.feature && typeof item.feature.show !== "undefined") {
-                item.feature.show = visible;
-            }
-        }
-
-        // 진행 중인 측정 오브젝트들도 같이 숨김/표시
-        for (let i = 0; i < cesiumMeasureEntitiesArray.length; i = i + 1) {
-            const e = cesiumMeasureEntitiesArray[i];
-            if (e && typeof e.show !== "undefined") {
-                e.show = visible;
-            }
-        }
-        if (cesiumMeasurePolylineEntity && typeof cesiumMeasurePolylineEntity.show !== "undefined") {
-            cesiumMeasurePolylineEntity.show = visible;
-        }
-        if (cesiumMeasureTooltipLabel && typeof cesiumMeasureTooltipLabel.show !== "undefined") {
-            cesiumMeasureTooltipLabel.show = visible;
-        }
-
-        for (let i = 0; i < cesiumAreaEntitiesArray.length; i = i + 1) {
-            const e = cesiumAreaEntitiesArray[i];
-            if (e && typeof e.show !== "undefined") {
-                e.show = visible;
-            }
-        }
-        if (cesiumAreaPolygonEntity && typeof cesiumAreaPolygonEntity.show !== "undefined") {
-            cesiumAreaPolygonEntity.show = visible;
-        }
-        if (cesiumAreaTooltipLabel && typeof cesiumAreaTooltipLabel.show !== "undefined") {
-            cesiumAreaTooltipLabel.show = visible;
-        }
-    }
-}
-
-function showMeasurementGraphicsIfNeeded() {
-    setMeasurementGraphicsVisible(true);
-}
-
-function hideMeasurementGraphicsIfNeeded() {
-    if (isAnyMeasureUiOpen()) {
-        return;
-    }
-    setMeasurementGraphicsVisible(false);
-}
-
 function openTabExampleModal() {
-    isMeasurePanelOpen = true;
-    showMeasurementGraphicsIfNeeded();
-
     const tabExampleModalDiv = document.getElementById("tabExampleModal");
     if (tabExampleModalDiv != null) {
         tabExampleModalDiv.style.display = "block";
@@ -3287,13 +2930,6 @@ function closeTabExampleModal() {
     if (tabExampleModalDiv != null) {
         tabExampleModalDiv.style.display = "none";
     }
-
-    // 탭 모달 닫을 때 진행 중인 측정은 정리해주기
-    stopMeasureFunction();
-    stopAreaMeasureFunction();
-
-    isMeasurePanelOpen = false;
-    hideMeasurementGraphicsIfNeeded();
 }
 
 function switchTab(tabName) {
@@ -3330,23 +2966,27 @@ function switchTab(tabName) {
     if (selectedTabPaneElement != null) {
         selectedTabPaneElement.classList.add("active");
     }
-
-    const distanceFooter = document.getElementById("tab-distance-footer");
-    const areaFooter = document.getElementById("tab-area-footer");
+    
+    const measureStartBtn = document.getElementById("tab-measure-start-btn");
+    const measureClearBtn = document.getElementById("tab-measure-clear-btn");
     if (tabName === "distance") {
-        if (distanceFooter != null) {
-            distanceFooter.style.display = "flex";
+        if (measureStartBtn != null) {
+            measureStartBtn.onclick = function() { startMeasureFromTab(); };
+            measureStartBtn.textContent = "측정 시작";
         }
-        if (areaFooter != null) {
-            areaFooter.style.display = "none";
+        if (measureClearBtn != null) {
+            measureClearBtn.onclick = function() { clearMeasuresFromTab(); };
+            measureClearBtn.textContent = "전체 삭제";
         }
     }
     else if (tabName === "area") {
-        if (distanceFooter != null) {
-            distanceFooter.style.display = "none";
+        if (measureStartBtn != null) {
+            measureStartBtn.onclick = function() { startAreaMeasureFromTab(); };
+            measureStartBtn.textContent = "측정 시작";
         }
-        if (areaFooter != null) {
-            areaFooter.style.display = "flex";
+        if (measureClearBtn != null) {
+            measureClearBtn.onclick = function() { clearAreasFromTab(); };
+            measureClearBtn.textContent = "전체 삭제";
         }
     }
 }
