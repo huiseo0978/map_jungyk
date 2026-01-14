@@ -339,7 +339,14 @@ let cesiumAreaClickHandler = null;
 let cesiumAreaTooltipLabel = null;
 let lastAreaResult = null;
 
+let isMeasurePanelOpen = false;
+let isMeasureGraphicsVisible = true;
+
+
 function openMeasureModal() {
+    isMeasurePanelOpen = true;
+    showMeasurementGraphicsIfNeeded();
+
     const tabExampleModalDiv = document.getElementById("tabExampleModal");
     if (tabExampleModalDiv != null) {
         openTabExampleModal();
@@ -369,6 +376,8 @@ function closeMeasureModal() {
         measureModalElement.style.display = "none";
     }
     stopMeasureFunction();
+    isMeasurePanelOpen = false;
+    hideMeasurementGraphicsIfNeeded();
 }
 
 
@@ -382,6 +391,14 @@ function stopMeasureFunction() {
     }
     
     measurePointsArray = [];
+
+    for (let i = measureResultsArray.length - 1; i >= 0; i = i - 1) {
+        const item = measureResultsArray[i];
+        if (item && item.isPoint) {
+            measureResultsArray.splice(i, 1);
+        }
+    }
+    updateMeasureListFunction();
 }
 
 function stopMeasure2DFunction() {
@@ -2234,6 +2251,9 @@ window.goCityZoom = function(cityName) {
 };
 
 function openAreaModal() {
+    isMeasurePanelOpen = true;
+    showMeasurementGraphicsIfNeeded();
+
     const tabExampleModalDiv = document.getElementById("tabExampleModal");
     if (tabExampleModalDiv != null) {
         openTabExampleModal();
@@ -2263,6 +2283,8 @@ function closeAreaModal() {
         areaModalElement.style.display = "none";
     }
     stopAreaMeasureFunction();
+    isMeasurePanelOpen = false;
+    hideMeasurementGraphicsIfNeeded();
 }
 
 
@@ -2276,6 +2298,14 @@ function stopAreaMeasureFunction() {
     }
     
     areaPointsArray = [];
+
+    for (let i = areaResultsArray.length - 1; i >= 0; i = i - 1) {
+        const item = areaResultsArray[i];
+        if (item && item.isPoint) {
+            areaResultsArray.splice(i, 1);
+        }
+    }
+    updateAreaListFunction();
 }
 
 function stopAreaMeasure2DFunction() {
@@ -2475,19 +2505,7 @@ function handleAreaClick3DFunction(clickEvent) {
         return;
     }
 
-    let pickedCartesian = null;
-
-    if (cesiumViewer && cesiumViewer.scene) {
-        const ray = cesiumViewer.camera.getPickRay(clickEvent.position);
-        if (ray) {
-            pickedCartesian = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
-        }
-    }
-
-    if (!pickedCartesian) {
-        pickedCartesian = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
-    }
-
+    const pickedCartesian = pickCesiumGroundPosition(clickEvent.position);
     if (!pickedCartesian) {
         return;
     }
@@ -2516,17 +2534,12 @@ function handleAreaClick3DFunction(clickEvent) {
         const calculatedArea = calculateCesiumArea();
         displayText = formatCesiumArea(calculatedArea);
 
-        const positionsArray = [];
-        for (let pointIndex = 0; pointIndex < cesiumAreaEntitiesArray.length; pointIndex = pointIndex + 1) {
-            const currentEntity = cesiumAreaEntitiesArray[pointIndex];
-            if (currentEntity) {
-                const currentPosition = currentEntity.position.getValue();
-                positionsArray.push(currentPosition);
-            }
+        const degreesArray = [];
+        for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
+            const currentPoint = areaPointsArray[pointIndex];
+            degreesArray.push(currentPoint[0], currentPoint[1]);
         }
-        if (positionsArray.length > 0) {
-            positionsArray.push(positionsArray[0]);
-        }
+        const positionsArray = Cesium.Cartesian3.fromDegreesArray(degreesArray);
 
         if (cesiumAreaPolygonEntity && cesiumAreaPolygonEntity.polygon) {
             cesiumAreaPolygonEntity.polygon.hierarchy = new Cesium.PolygonHierarchy(positionsArray);
@@ -3074,7 +3087,127 @@ window.clearAreas = clearAreas;
 window.removeAreaItem = removeAreaItem;
 window.goToAreaEndPoint = goToAreaEndPoint;
 
+
+function isAnyMeasureUiOpen() {
+    const tabExampleModalDiv = document.getElementById("tabExampleModal");
+    const measureModalElement = document.getElementById("measureModal");
+    const areaModalElement = document.getElementById("areaModal");
+
+    if (tabExampleModalDiv != null && tabExampleModalDiv.style.display === "block") {
+        return true;
+    }
+    if (measureModalElement != null && measureModalElement.style.display === "block") {
+        return true;
+    }
+    if (areaModalElement != null && areaModalElement.style.display === "block") {
+        return true;
+    }
+    return false;
+}
+
+function setMeasurementGraphicsVisible(visible) {
+    isMeasureGraphicsVisible = visible;
+
+    // 2D(OpenLayers)
+    if (measureLayer && typeof measureLayer.setVisible === "function") {
+        measureLayer.setVisible(visible);
+    }
+
+    // 3D(Cesium)
+    if (cesiumViewer) {
+        for (let i = 0; i < measureResultsArray.length; i = i + 1) {
+            const item = measureResultsArray[i];
+            if (!item) {
+                continue;
+            }
+
+            if (item.feature && typeof item.feature.show !== "undefined") {
+                item.feature.show = visible;
+            }
+
+            if (item.pointEntities && Array.isArray(item.pointEntities)) {
+                for (let j = 0; j < item.pointEntities.length; j = j + 1) {
+                    const pointEntity = item.pointEntities[j];
+                    if (pointEntity && typeof pointEntity.show !== "undefined") {
+                        pointEntity.show = visible;
+                    }
+                }
+            }
+
+            // 중간 클릭 결과(점)도 리스트에 남아있을 수 있어서 같이 처리
+            if (item.isPoint && item.feature && typeof item.feature.show !== "undefined") {
+                item.feature.show = visible;
+            }
+        }
+
+        for (let i = 0; i < areaResultsArray.length; i = i + 1) {
+            const item = areaResultsArray[i];
+            if (!item) {
+                continue;
+            }
+
+            if (item.feature && typeof item.feature.show !== "undefined") {
+                item.feature.show = visible;
+            }
+
+            if (item.pointEntities && Array.isArray(item.pointEntities)) {
+                for (let j = 0; j < item.pointEntities.length; j = j + 1) {
+                    const pointEntity = item.pointEntities[j];
+                    if (pointEntity && typeof pointEntity.show !== "undefined") {
+                        pointEntity.show = visible;
+                    }
+                }
+            }
+
+            if (item.isPoint && item.feature && typeof item.feature.show !== "undefined") {
+                item.feature.show = visible;
+            }
+        }
+
+        // 진행 중인 측정 오브젝트들도 같이 숨김/표시
+        for (let i = 0; i < cesiumMeasureEntitiesArray.length; i = i + 1) {
+            const e = cesiumMeasureEntitiesArray[i];
+            if (e && typeof e.show !== "undefined") {
+                e.show = visible;
+            }
+        }
+        if (cesiumMeasurePolylineEntity && typeof cesiumMeasurePolylineEntity.show !== "undefined") {
+            cesiumMeasurePolylineEntity.show = visible;
+        }
+        if (cesiumMeasureTooltipLabel && typeof cesiumMeasureTooltipLabel.show !== "undefined") {
+            cesiumMeasureTooltipLabel.show = visible;
+        }
+
+        for (let i = 0; i < cesiumAreaEntitiesArray.length; i = i + 1) {
+            const e = cesiumAreaEntitiesArray[i];
+            if (e && typeof e.show !== "undefined") {
+                e.show = visible;
+            }
+        }
+        if (cesiumAreaPolygonEntity && typeof cesiumAreaPolygonEntity.show !== "undefined") {
+            cesiumAreaPolygonEntity.show = visible;
+        }
+        if (cesiumAreaTooltipLabel && typeof cesiumAreaTooltipLabel.show !== "undefined") {
+            cesiumAreaTooltipLabel.show = visible;
+        }
+    }
+}
+
+function showMeasurementGraphicsIfNeeded() {
+    setMeasurementGraphicsVisible(true);
+}
+
+function hideMeasurementGraphicsIfNeeded() {
+    if (isAnyMeasureUiOpen()) {
+        return;
+    }
+    setMeasurementGraphicsVisible(false);
+}
+
 function openTabExampleModal() {
+    isMeasurePanelOpen = true;
+    showMeasurementGraphicsIfNeeded();
+
     const tabExampleModalDiv = document.getElementById("tabExampleModal");
     if (tabExampleModalDiv != null) {
         tabExampleModalDiv.style.display = "block";
@@ -3091,6 +3224,13 @@ function closeTabExampleModal() {
     if (tabExampleModalDiv != null) {
         tabExampleModalDiv.style.display = "none";
     }
+
+    // 탭 모달 닫을 때 진행 중인 측정은 정리해주기
+    stopMeasureFunction();
+    stopAreaMeasureFunction();
+
+    isMeasurePanelOpen = false;
+    hideMeasurementGraphicsIfNeeded();
 }
 
 function switchTab(tabName) {
