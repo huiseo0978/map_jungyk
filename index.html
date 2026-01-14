@@ -23,8 +23,7 @@
     <button type="button" onclick="goCity('busan')" ondblclick="goCityZoom('busan')">부산</button>
     <button type="button" onclick="goCity('jeju')" ondblclick="goCityZoom('jeju')">제주</button>
     <button id="moveModalBtn" type="button" onclick="openMoveModal()">지도 이동</button>
-    <button id="measureModalBtn" type="button" onclick="openMeasureModal()">거리 계산</button>
-    <button id="areaModalBtn" type="button" onclick="openAreaModal()">면적 계산</button>
+    <button id="tabExampleBtn" type="button" onclick="openTabExampleModal()">거리/면적</button>
     <button id="toggleTopbar" type="button" onclick="toggleTopbar()">메뉴 숨기기</button>
   </div>
 
@@ -87,6 +86,45 @@
     </div>
   </div>
 
+  <div id="tabExampleModal" class="modal">
+    <div class="modal_popup tab-modal-width">
+      <div class="modal-header">
+        <h3>거리/면적 계산</h3>
+        <button class="modal-close" onclick="closeTabExampleModal()">×</button>
+      </div>
+      <div class="tab-container">
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="switchTab('distance')">거리</button>
+          <button class="tab-btn" onclick="switchTab('area')">면적</button>
+        </div>
+        <div class="tab-content">
+          <div id="tab-distance" class="tab-pane active">
+            <div class="tab-content-body">
+              <div id="tab-measure-results">
+                결과가 여기에 표시됩니다.
+              </div>
+            </div>
+          </div>
+          <div id="tab-area" class="tab-pane">
+            <div class="tab-content-body">
+              <div id="tab-area-results">
+                결과가 여기에 표시됩니다. (점 3개 이상 필요)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+            <div class="tab-modal-footer">
+        <div id="tab-distance-footer" class="tab-footer-icons">
+          <button type="button" onclick="startMeasureFromTab()">측정 시작</button>
+          <button type="button" onclick="clearMeasuresFromTab()">전체 삭제</button>
+        </div>
+        <div id="tab-area-footer" class="tab-footer-icons" style="display:none">
+          <button type="button" onclick="startAreaMeasureFromTab()">측정 시작</button>
+          <button type="button" onclick="clearAreasFromTab()">전체 삭제</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="map"></div>

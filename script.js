@@ -67,6 +67,9 @@ const map = new ol.Map({
     view: mainView
 });
 
+// 측정 레이어 기본 숨김 (모달 열 때만 보이게)
+measureLayer.setVisible(false);
+
 const doubleClickZoomInteraction = map.getInteractions().getArray().find(function(interaction) {
     return interaction instanceof ol.interaction.DoubleClickZoom;
 });
@@ -338,6 +341,61 @@ let cesiumAreaPolygonEntity = null;
 let cesiumAreaClickHandler = null;
 let cesiumAreaTooltipLabel = null;
 let lastAreaResult = null;
+
+// ===============================
+// 거리/면적 결과 표시(보이기/숨기기)
+// - 모달이 열려 있을 때만 라인/폴리곤 보이게
+// ===============================
+let isMeasureModalOpen = false;
+let isAreaModalOpen = false;
+let isTabExampleModalOpen = false;
+
+function setMeasurementGraphicsVisible(isVisible) {
+    if (is3DModeActive) {
+        if (cesiumViewer) {
+            for (let i = 0; i < measureResultsArray.length; i = i + 1) {
+                const item = measureResultsArray[i];
+                if (item && item.feature && typeof item.feature.show !== "undefined") {
+                    item.feature.show = isVisible;
+                }
+                if (item && item.pointEntities) {
+                    for (let j = 0; j < item.pointEntities.length; j = j + 1) {
+                        const ent = item.pointEntities[j];
+                        if (ent && typeof ent.show !== "undefined") {
+                            ent.show = isVisible;
+                        }
+                    }
+                }
+            }
+            for (let k = 0; k < areaResultsArray.length; k = k + 1) {
+                const item = areaResultsArray[k];
+                if (item && item.feature && typeof item.feature.show !== "undefined") {
+                    item.feature.show = isVisible;
+                }
+                if (item && item.pointEntities) {
+                    for (let m = 0; m < item.pointEntities.length; m = m + 1) {
+                        const ent = item.pointEntities[m];
+                        if (ent && typeof ent.show !== "undefined") {
+                            ent.show = isVisible;
+                        }
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // 2D는 측정 레이어 자체를 숨기는 게 가장 깔끔함
+    if (measureLayer && typeof measureLayer.setVisible === "function") {
+        measureLayer.setVisible(isVisible);
+    }
+}
+
+function updateMeasurementGraphicsVisibility() {
+    const shouldShow = isMeasureModalOpen || isAreaModalOpen || isTabExampleModalOpen;
+    setMeasurementGraphicsVisible(shouldShow);
+}
+
 
 let isMeasurePanelOpen = false;
 let isMeasureGraphicsVisible = true;
@@ -2130,6 +2188,8 @@ function toggle3D(is3DEnabled) {
             map.updateSize();
         }
     }
+
+    updateMeasurementGraphicsVisibility();
 }
 
 const modeSwitch = document.getElementById("modeSwitch");
@@ -2826,7 +2886,10 @@ function updateAreaListFunction() {
             } else {
                 htmlContent = htmlContent + "<span class='measure-text' onclick='goToAreaEndPoint(" + currentItem.id + ")'>" + currentItem.text + "</span>";
             }
-            htmlContent = htmlContent + "<span class='measure-delete' onclick='removeAreaItem(" + currentItem.id + ")'>삭제</span>";
+            if (!currentItem.isPoint || !isAreaMeasuringNow || areaPointsArray.length >= 3) {
+                htmlContent = htmlContent + "<span class='measure-delete' onclick='removeAreaItem(" + currentItem.id + ")'>삭제</span>";
+            }
+
             htmlContent = htmlContent + "</div>";
         }
     }
@@ -3267,27 +3330,23 @@ function switchTab(tabName) {
     if (selectedTabPaneElement != null) {
         selectedTabPaneElement.classList.add("active");
     }
-    
-    const measureStartBtn = document.getElementById("tab-measure-start-btn");
-    const measureClearBtn = document.getElementById("tab-measure-clear-btn");
+
+    const distanceFooter = document.getElementById("tab-distance-footer");
+    const areaFooter = document.getElementById("tab-area-footer");
     if (tabName === "distance") {
-        if (measureStartBtn != null) {
-            measureStartBtn.onclick = function() { startMeasureFromTab(); };
-            measureStartBtn.textContent = "측정 시작";
+        if (distanceFooter != null) {
+            distanceFooter.style.display = "flex";
         }
-        if (measureClearBtn != null) {
-            measureClearBtn.onclick = function() { clearMeasuresFromTab(); };
-            measureClearBtn.textContent = "전체 삭제";
+        if (areaFooter != null) {
+            areaFooter.style.display = "none";
         }
     }
     else if (tabName === "area") {
-        if (measureStartBtn != null) {
-            measureStartBtn.onclick = function() { startAreaMeasureFromTab(); };
-            measureStartBtn.textContent = "측정 시작";
+        if (distanceFooter != null) {
+            distanceFooter.style.display = "none";
         }
-        if (measureClearBtn != null) {
-            measureClearBtn.onclick = function() { clearAreasFromTab(); };
-            measureClearBtn.textContent = "전체 삭제";
+        if (areaFooter != null) {
+            areaFooter.style.display = "flex";
         }
     }
 }
