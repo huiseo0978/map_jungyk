@@ -142,6 +142,7 @@ let cesiumViewer = null;
 let cesiumCityEntitiesArray = [];
 let cesiumActiveMarker = null;
 let cesiumEventHandler = null;
+let isSyncingZoom = false;
 
 const popupElement = document.getElementById("popup");
 const cityPopup = new ol.Overlay({
@@ -242,6 +243,31 @@ map.getView().on('change:resolution', function() {
         const currentZoom = mainView.getZoom();
         const roundedZoom = Math.round(currentZoom);
         levelInfoElement.innerText = "줌 레벨: " + roundedZoom;
+    }
+    
+    if (isSyncingZoom) {
+        return;
+    }
+    if (cesiumViewer && is3DModeActive === false) {
+        const currentCenter = mainView.getCenter();
+        if (currentCenter) {
+            const currentLonLat = ol.proj.toLonLat(currentCenter);
+            const currentZoom = mainView.getZoom();
+            const latitudeRadians = currentLonLat[1] * Math.PI / 180;
+            const metersPerPixelAtEquator = 156543.03392;
+            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+            const targetHeight = metersPerPixel / Math.pow(2, currentZoom);
+            const clampedHeight = Math.max(100, Math.min(40000000, targetHeight));
+            
+            isSyncingZoom = true;
+            cesiumViewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(currentLonLat[0], currentLonLat[1], clampedHeight),
+                duration: 0.3
+            });
+            setTimeout(function() {
+                isSyncingZoom = false;
+            }, 400);
+        }
     }
 });
 
@@ -1907,6 +1933,46 @@ function toggle3D(is3DEnabled) {
                     const roundedHeight = Math.round(cameraHeight);
                     levelInfoElement.innerText = "높이: " + roundedHeight + "m";
                 }
+                
+                if (isSyncingZoom) {
+                    return;
+                }
+                if (is3DModeActive && map && mainView) {
+                    const cameraPosition = cesiumViewer.camera.positionCartographic;
+                    const cameraLon = Cesium.Math.toDegrees(cameraPosition.longitude);
+                    const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
+                    const latitudeRadians = cameraPosition.latitude;
+                    const metersPerPixelAtEquator = 156543.03392;
+                    const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+                    const mapSize = map.getSize();
+                    let targetZoom = 13;
+                    if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
+                        const viewportHeight = mapSize[1];
+                        const viewportHeightInMeters = cameraHeight * 2 * Math.tan(cesiumViewer.camera.frustum.fov / 2);
+                        const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
+                        targetZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
+                    } else {
+                        const estimatedMetersPerPixel = cameraHeight / 256;
+                        targetZoom = Math.log2(metersPerPixel / estimatedMetersPerPixel);
+                    }
+                    if (targetZoom < 0) {
+                        targetZoom = 0;
+                    }
+                    if (targetZoom > 20) {
+                        targetZoom = 20;
+                    }
+                    
+                    isSyncingZoom = true;
+                    const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
+                    mainView.animate({
+                        center: coordinate,
+                        zoom: targetZoom,
+                        duration: 300
+                    });
+                    setTimeout(function() {
+                        isSyncingZoom = false;
+                    }, 400);
+                }
             });
             cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
             cesiumEventHandler.setInputAction(function(movementEvent) {
@@ -2196,6 +2262,62 @@ function toggle3D(is3DEnabled) {
                 }
             }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
         } else {
+            if (cesiumViewer) {
+                let hasCameraListener = false;
+                if (cesiumViewer.camera._changed) {
+                    hasCameraListener = true;
+                }
+                if (!hasCameraListener) {
+                    cesiumViewer.camera.changed.addEventListener(function() {
+                        const cameraHeight = cesiumViewer.camera.positionCartographic.height;
+                        const levelInfoElement = document.getElementById("level-info");
+                        if (levelInfoElement) {
+                            const roundedHeight = Math.round(cameraHeight);
+                            levelInfoElement.innerText = "높이: " + roundedHeight + "m";
+                        }
+                        
+                        if (isSyncingZoom) {
+                            return;
+                        }
+                        if (is3DModeActive && map && mainView) {
+                            const cameraPosition = cesiumViewer.camera.positionCartographic;
+                            const cameraLon = Cesium.Math.toDegrees(cameraPosition.longitude);
+                            const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
+                            const latitudeRadians = cameraPosition.latitude;
+                            const metersPerPixelAtEquator = 156543.03392;
+                            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+                            const mapSize = map.getSize();
+                            let targetZoom = 13;
+                            if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
+                                const viewportHeight = mapSize[1];
+                                const viewportHeightInMeters = cameraHeight * 2 * Math.tan(cesiumViewer.camera.frustum.fov / 2);
+                                const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
+                                targetZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
+                            } else {
+                                const estimatedMetersPerPixel = cameraHeight / 256;
+                                targetZoom = Math.log2(metersPerPixel / estimatedMetersPerPixel);
+                            }
+                            if (targetZoom < 0) {
+                                targetZoom = 0;
+                            }
+                            if (targetZoom > 20) {
+                                targetZoom = 20;
+                            }
+                            
+                            isSyncingZoom = true;
+                            const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
+                            mainView.animate({
+                                center: coordinate,
+                                zoom: targetZoom,
+                                duration: 300
+                            });
+                            setTimeout(function() {
+                                isSyncingZoom = false;
+                            }, 400);
+                        }
+                    });
+                }
+            }
             if (cesiumEventHandler === null) {
                 cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
             }
@@ -2534,13 +2656,17 @@ function toggle3D(is3DEnabled) {
                 });
                 cesiumCityEntitiesArray.push(cityEntityForCesium);
             }
-        } else {
-            if (cesiumViewer) {
-                cesiumViewer.camera.flyTo({
-                    destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
-                    duration: 0.5
-                });
-            }
+        }
+        
+        if (cesiumViewer) {
+            setTimeout(function() {
+                if (cesiumViewer && !cesiumViewer.isDestroyed()) {
+                    cesiumViewer.camera.flyTo({
+                        destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
+                        duration: 0.5
+                    });
+                }
+            }, 100);
         }
     }
     
@@ -2562,7 +2688,19 @@ function toggle3D(is3DEnabled) {
                 Cesium.Math.toDegrees(cameraPosition.latitude)
             ];
             const cameraHeight = cameraPosition.height;
-            targetZoom = Math.log2(156543.03392 * Math.cos(targetLonlat[1] * Math.PI / 180) / cameraHeight);
+            const latitudeRadians = cameraPosition.latitude;
+            const metersPerPixelAtEquator = 156543.03392;
+            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+            const mapSize = map.getSize();
+            if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
+                const viewportHeight = mapSize[1];
+                const viewportHeightInMeters = cameraHeight * 2 * Math.tan(cesiumViewer.camera.frustum.fov / 2);
+                const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
+                targetZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
+            } else {
+                const estimatedMetersPerPixel = cameraHeight / 256;
+                targetZoom = Math.log2(metersPerPixel / estimatedMetersPerPixel);
+            }
             if (targetZoom < 0) {
                 targetZoom = 0;
             }
@@ -3488,26 +3626,23 @@ function switchTab(tabName) {
         selectedTabPaneElement.classList.add("active");
     }
     
-    const measureStartBtn = document.getElementById("tab-measure-start-btn");
-    const measureClearBtn = document.getElementById("tab-measure-clear-btn");
+    const tabDistanceFooter = document.getElementById("tab-distance-footer");
+    const tabAreaFooter = document.getElementById("tab-area-footer");
+    
     if (tabName === "distance") {
-        if (measureStartBtn != null) {
-            measureStartBtn.onclick = function() { startMeasureFromTab(); };
-            measureStartBtn.textContent = "측정 시작";
+        if (tabDistanceFooter != null) {
+            tabDistanceFooter.style.display = "flex";
         }
-        if (measureClearBtn != null) {
-            measureClearBtn.onclick = function() { clearMeasuresFromTab(); };
-            measureClearBtn.textContent = "전체 삭제";
+        if (tabAreaFooter != null) {
+            tabAreaFooter.style.display = "none";
         }
     }
     else if (tabName === "area") {
-        if (measureStartBtn != null) {
-            measureStartBtn.onclick = function() { startAreaMeasureFromTab(); };
-            measureStartBtn.textContent = "측정 시작";
+        if (tabDistanceFooter != null) {
+            tabDistanceFooter.style.display = "none";
         }
-        if (measureClearBtn != null) {
-            measureClearBtn.onclick = function() { clearAreasFromTab(); };
-            measureClearBtn.textContent = "전체 삭제";
+        if (tabAreaFooter != null) {
+            tabAreaFooter.style.display = "flex";
         }
     }
 }
