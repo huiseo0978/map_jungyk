@@ -1819,6 +1819,26 @@ function toggle3D(is3DEnabled) {
     const cesiumContainerElement = document.getElementById("cesiumContainer");
 
     if (is3DEnabled) {
+        let targetLonlat = [127.0276, 37.4979];
+        let targetHeight = 15000;
+        
+        if (map && mainView) {
+            const currentCenter = mainView.getCenter();
+            if (currentCenter) {
+                targetLonlat = ol.proj.toLonLat(currentCenter);
+            }
+            const currentZoom = mainView.getZoom();
+            if (currentZoom !== undefined) {
+                targetHeight = 156543.03392 * Math.cos(targetLonlat[1] * Math.PI / 180) / Math.pow(2, currentZoom);
+                if (targetHeight < 100) {
+                    targetHeight = 100;
+                }
+                if (targetHeight > 40000000) {
+                    targetHeight = 40000000;
+                }
+            }
+        }
+        
         if (cesiumViewer === null) {
             Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI0NjI0YTQwNC0wMTYyLTQ4N2EtOTMzZi01OTE5OGUxOTc1NGEiLCJpZCI6Mzc3OTMzLCJpYXQiOjE3NjgyODU3NTF9.PKa3bqkvaE_GoFPI7HK9a3bONYA5A5fQjjJuq-pnyXE';
 
@@ -1867,9 +1887,8 @@ function toggle3D(is3DEnabled) {
             } catch (e) {
             }
 
-            const initialCenter = [127.0276, 37.4979];
             cesiumViewer.camera.setView({
-                destination: Cesium.Cartesian3.fromDegrees(initialCenter[0], initialCenter[1], 15000),
+                destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
                 orientation: {
                     heading: Cesium.Math.toRadians(0),
                     pitch: Cesium.Math.toRadians(-45),
@@ -2515,6 +2534,13 @@ function toggle3D(is3DEnabled) {
                 });
                 cesiumCityEntitiesArray.push(cityEntityForCesium);
             }
+        } else {
+            if (cesiumViewer) {
+                cesiumViewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
+                    duration: 0.5
+                });
+            }
         }
     }
     
@@ -2526,12 +2552,39 @@ function toggle3D(is3DEnabled) {
             cesiumContainerElement.style.display = "block";
         }
     } else {
+        let targetLonlat = [127.0276, 37.4979];
+        let targetZoom = 13;
+        
+        if (cesiumViewer) {
+            const cameraPosition = cesiumViewer.camera.positionCartographic;
+            targetLonlat = [
+                Cesium.Math.toDegrees(cameraPosition.longitude),
+                Cesium.Math.toDegrees(cameraPosition.latitude)
+            ];
+            const cameraHeight = cameraPosition.height;
+            targetZoom = Math.log2(156543.03392 * Math.cos(targetLonlat[1] * Math.PI / 180) / cameraHeight);
+            if (targetZoom < 0) {
+                targetZoom = 0;
+            }
+            if (targetZoom > 20) {
+                targetZoom = 20;
+            }
+        }
+        
         if (cesiumContainerElement) {
             cesiumContainerElement.style.display = "none";
         }
         if (mapElement) {
             mapElement.style.display = "block";
             map.updateSize();
+            if (map && mainView) {
+                const coordinate = ol.proj.fromLonLat(targetLonlat);
+                mainView.animate({
+                    center: coordinate,
+                    zoom: targetZoom,
+                    duration: 500
+                });
+            }
         }
     }
 }
