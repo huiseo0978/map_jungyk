@@ -248,25 +248,31 @@ map.getView().on('change:resolution', function() {
     if (isSyncingZoom) {
         return;
     }
-    if (cesiumViewer && is3DModeActive === false) {
+    if (cesiumViewer && !is3DModeActive) {
         const currentCenter = mainView.getCenter();
         if (currentCenter) {
             const currentLonLat = ol.proj.toLonLat(currentCenter);
             const currentZoom = mainView.getZoom();
             const latitudeRadians = currentLonLat[1] * Math.PI / 180;
             const metersPerPixelAtEquator = 156543.03392;
-            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
-            const targetHeight = metersPerPixel / Math.pow(2, currentZoom);
-            const clampedHeight = Math.max(100, Math.min(40000000, targetHeight));
-            
-            isSyncingZoom = true;
-            cesiumViewer.camera.flyTo({
-                destination: Cesium.Cartesian3.fromDegrees(currentLonLat[0], currentLonLat[1], clampedHeight),
-                duration: 0.3
-            });
-            setTimeout(function() {
-                isSyncingZoom = false;
-            }, 400);
+            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians) / Math.pow(2, currentZoom);
+            const mapSize = map.getSize();
+            if (mapSize && mapSize[1] > 0) {
+                const viewportHeightInPixels = mapSize[1];
+                const viewportHeightInMeters = metersPerPixel * viewportHeightInPixels;
+                const cesiumFOV = Math.PI / 3;
+                const targetHeight = viewportHeightInMeters / (2 * Math.tan(cesiumFOV / 2));
+                const clampedHeight = Math.max(100, Math.min(40000000, targetHeight));
+                
+                isSyncingZoom = true;
+                cesiumViewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(currentLonLat[0], currentLonLat[1], clampedHeight),
+                    duration: 0.3
+                });
+                setTimeout(function() {
+                    isSyncingZoom = false;
+                }, 400);
+            }
         }
     }
 });
@@ -1855,7 +1861,18 @@ function toggle3D(is3DEnabled) {
             }
             const currentZoom = mainView.getZoom();
             if (currentZoom !== undefined) {
-                targetHeight = 156543.03392 * Math.cos(targetLonlat[1] * Math.PI / 180) / Math.pow(2, currentZoom);
+                const latitudeRadians = targetLonlat[1] * Math.PI / 180;
+                const metersPerPixelAtEquator = 156543.03392;
+                const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians) / Math.pow(2, currentZoom);
+                const mapSize = map.getSize();
+                if (mapSize && mapSize[1] > 0) {
+                    const viewportHeightInPixels = mapSize[1];
+                    const viewportHeightInMeters = metersPerPixel * viewportHeightInPixels;
+                    const cesiumFOV = Math.PI / 3;
+                    targetHeight = viewportHeightInMeters / (2 * Math.tan(cesiumFOV / 2));
+                } else {
+                    targetHeight = 156543.03392 * Math.cos(latitudeRadians) / Math.pow(2, currentZoom) * 512;
+                }
                 if (targetHeight < 100) {
                     targetHeight = 100;
                 }
@@ -1993,6 +2010,7 @@ function toggle3D(is3DEnabled) {
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
                     let foundActiveMarker = false;
+                    let closestCityEntity = null;
                     
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
@@ -2339,6 +2357,7 @@ function toggle3D(is3DEnabled) {
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
                     let foundActiveMarker = false;
+                    let closestCityEntity = null;
                     
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
