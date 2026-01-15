@@ -81,19 +81,54 @@ const cityInfos = {
     jeju: { name: "제주", lonlat: [126.5312, 33.4996] }
 };
 
-const cityPointStyle = new ol.style.Style({
-    image: new ol.style.Circle({
-        radius: 7,
-        fill: new ol.style.Fill({ color: "rgba(0, 123, 255, 1)" }),
-        stroke: new ol.style.Stroke({ color: "white", width: 2 })
-    })
-});
+function svgToDataUri(svgText) {
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svgText);
+}
+
+const cityPinSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <path fill="#e53935" stroke="#ffffff" stroke-width="1.5" d="M12 2c-3.314 0-6 2.686-6 6 0 4.418 6 14 6 14s6-9.582 6-14c0-3.314-2.686-6-6-6z"/>
+    <circle cx="12" cy="8" r="2.4" fill="#ffffff"/>
+</svg>`.trim();
+
+const cityPinDataUri = svgToDataUri(cityPinSvg);
+
+const markerIconImageUrl = 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
+
+const cityStyleCache = {};
+const cityPointStyle = function(feature) {
+    const cityName = feature.get("name") || "";
+    if (cityStyleCache[cityName]) return cityStyleCache[cityName];
+  
+    const styleObject = new ol.style.Style({
+      image: new ol.style.Icon({
+        src: markerIconImageUrl,
+        anchor: [0.5, 1],
+        scale: 1
+      }),
+      text: new ol.style.Text({
+        text: cityName,
+        textAlign: "center",
+        offsetY: -34,
+        font: "bold 13px sans-serif",
+        fill: new ol.style.Fill({ color: "#ffffff" }),
+        stroke: new ol.style.Stroke({ color: "#000000", width: 3 }),
+        backgroundFill: new ol.style.Fill({ color: "rgba(0, 0, 0, 0.55)" }),
+        backgroundStroke: new ol.style.Stroke({ color: "rgba(0, 0, 0, 0.55)", width: 1 }),
+        padding: [2, 6, 2, 6]
+      })
+    });
+  
+    cityStyleCache[cityName] = styleObject;
+    return styleObject;
+  };
 
 const redMarkerStyle = new ol.style.Style({
-    image: new ol.style.Circle({
-        radius: 10,
-        fill: new ol.style.Fill({ color: "rgba(255, 0, 0, 1)" }),
-        stroke: new ol.style.Stroke({ color: "white", width: 3 })
+    image: new ol.style.Icon({
+        src: markerIconImageUrl,
+        anchor: [0.5, 1],
+        scale: 1,
+        anchorXUnits: 'fraction',
+        anchorYUnits: 'fraction'
     })
 });
 
@@ -160,7 +195,7 @@ function handlePointerMoveEvent(event) {
                 return false;
             }
         },
-        hitTolerance: 3
+        hitTolerance: 10
     });
 
     const popupContentElement = document.getElementById("popup-content");
@@ -170,6 +205,20 @@ function handlePointerMoveEvent(event) {
             if (popupContentElement) {
                 const cityNameValue = featureAtPixel.get("name");
                 popupContentElement.innerHTML = cityNameValue;
+            }
+            cityPopup.setPosition(event.coordinate);
+            const mapTargetElement = map.getTargetElement();
+            if (mapTargetElement) {
+                mapTargetElement.style.cursor = 'pointer';
+            }
+        } else if (featureType === "marker") {
+            if (popupContentElement) {
+                const markerLonlat = featureAtPixel.get("lonlat");
+                if (markerLonlat) {
+                    popupContentElement.innerHTML = `위치<br>경도: ${markerLonlat[0].toFixed(6)}<br>위도: ${markerLonlat[1].toFixed(6)}`;
+                } else {
+                    popupContentElement.innerHTML = "위치 마커";
+                }
             }
             cityPopup.setPosition(event.coordinate);
             const mapTargetElement = map.getTargetElement();
@@ -233,12 +282,15 @@ function setMarker(lonlat) {
             const cartesianPosition = Cesium.Cartesian3.fromRadians(cartographicPosition.longitude, cartographicPosition.latitude);
             cesiumActiveMarker = cesiumViewer.entities.add({
                 position: cartesianPosition,
-                point: {
-                    pixelSize: 20,
-                    color: Cesium.Color.RED,
-                    outlineColor: Cesium.Color.WHITE,
-                    outlineWidth: 3,
-                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                billboard: {
+                    image: markerIconImageUrl,
+                    width: 32,
+                    height: 48,
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY
+                },
+                properties: {
+                    lonlat: lonlat
                 }
             });
         }
@@ -247,9 +299,12 @@ function setMarker(lonlat) {
         if (activeMarker === null) {
             activeMarker = new ol.Feature(new ol.geom.Point(coord));
             activeMarker.setStyle(redMarkerStyle);
+            activeMarker.set("type", "marker");
+            activeMarker.set("lonlat", lonlat);
             citySource.addFeature(activeMarker);
         } else {
             activeMarker.getGeometry().setCoordinates(coord);
+            activeMarker.set("lonlat", lonlat);
         }
     }
 }
@@ -268,16 +323,16 @@ function blinkMarker(featureToBlink, styleToApply) {
                 } else {
                     isVisible = true;
                 }
-                if (isVisible) {
-                    cesiumActiveMarker.point.pixelSize = 20;
-                } else {
-                    cesiumActiveMarker.point.pixelSize = 0;
+                if (cesiumActiveMarker && cesiumActiveMarker.billboard) {
+                    cesiumActiveMarker.billboard.show = isVisible;
                 }
                 blinkCount = blinkCount + 1;
                 if (blinkCount >= 10) {
                     clearInterval(markerBlinker);
                     markerBlinker = null;
-                    cesiumActiveMarker.point.pixelSize = 20;
+                    if (cesiumActiveMarker && cesiumActiveMarker.billboard) {
+                        cesiumActiveMarker.billboard.show = true;
+                    }
                 }
             }, 250);
         }
@@ -1862,46 +1917,81 @@ function toggle3D(is3DEnabled) {
                     const popupContentElement = document.getElementById("popup-content");
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
+                    let foundActiveMarker = false;
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
-                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
-                            if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
-                                foundCityEntity = true;
-                                const cityKeysArray = Object.keys(cityInfos);
-                                for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
-                                    const cityKey = cityKeysArray[keyIndex];
-                                    const cityData = cityInfos[cityKey];
-                                    const pickedPosition = pickedEntity.position.getValue();
-                                    const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
-                                    const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
-                                    const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
-                                    if (positionDistance < 100) {
-                                        if (popupContentElement) {
-                                            popupContentElement.innerHTML = cityData.name;
-                                        }
-                                        if (popupElement) {
-                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
-                                            if (screenPosition) {
-                                                popupElement.style.position = 'fixed';
-                                                popupElement.style.left = screenPosition.x + 'px';
-                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
-                                                popupElement.style.bottom = 'auto';
-                                                popupElement.style.display = 'block';
-                                                popupElement.style.zIndex = '10000';
-                                            }
-                                        }
-                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                                        if (cesiumCanvasElement) {
-                                            cesiumCanvasElement.style.cursor = 'pointer';
-                                        }
-                                        break;
-                                    }
+                        if (cesiumActiveMarker && pickedEntity === cesiumActiveMarker) {
+                            foundActiveMarker = true;
+                            const markerPosition = cesiumActiveMarker.position.getValue();
+                            const markerCartographic = Cesium.Cartographic.fromCartesian(markerPosition);
+                            const markerLon = Cesium.Math.toDegrees(markerCartographic.longitude);
+                            const markerLat = Cesium.Math.toDegrees(markerCartographic.latitude);
+                            let markerLonlat = [markerLon, markerLat];
+                            if (cesiumActiveMarker.properties) {
+                                if (cesiumActiveMarker.properties.lonlat) {
+                                    markerLonlat = cesiumActiveMarker.properties.lonlat.getValue();
                                 }
-                                break;
+                            }
+                            if (popupContentElement) {
+                                const lonString = markerLonlat[0].toFixed(6);
+                                const latString = markerLonlat[1].toFixed(6);
+                                popupContentElement.innerHTML = "위치<br>경도: " + lonString + "<br>위도: " + latString;
+                            }
+                            if (popupElement) {
+                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
+                                if (screenPosition) {
+                                    popupElement.style.position = 'fixed';
+                                    popupElement.style.left = screenPosition.x + 'px';
+                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                    popupElement.style.bottom = 'auto';
+                                    popupElement.style.display = 'block';
+                                    popupElement.style.zIndex = '10000';
+                                }
+                            }
+                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                            if (cesiumCanvasElement) {
+                                cesiumCanvasElement.style.cursor = 'pointer';
+                            }
+                        } else {
+                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
+                                    foundCityEntity = true;
+                                    const cityKeysArray = Object.keys(cityInfos);
+                                    for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
+                                        const cityKey = cityKeysArray[keyIndex];
+                                        const cityData = cityInfos[cityKey];
+                                        const pickedPosition = pickedEntity.position.getValue();
+                                        const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
+                                        const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
+                                        const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
+                                        if (positionDistance < 100) {
+                                            if (popupContentElement) {
+                                                popupContentElement.innerHTML = cityData.name;
+                                            }
+                                            if (popupElement) {
+                                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                                if (screenPosition) {
+                                                    popupElement.style.position = 'fixed';
+                                                    popupElement.style.left = screenPosition.x + 'px';
+                                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                    popupElement.style.bottom = 'auto';
+                                                    popupElement.style.display = 'block';
+                                                    popupElement.style.zIndex = '10000';
+                                                }
+                                            }
+                                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                            if (cesiumCanvasElement) {
+                                                cesiumCanvasElement.style.cursor = 'pointer';
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
-                    if (foundCityEntity === false) {
+                    if (foundCityEntity === false && foundActiveMarker === false) {
                         if (popupElement) {
                             popupElement.style.display = 'none';
                         }
@@ -1945,46 +2035,81 @@ function toggle3D(is3DEnabled) {
                     const popupContentElement = document.getElementById("popup-content");
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
+                    let foundActiveMarker = false;
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
-                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
-                            if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
-                                foundCityEntity = true;
-                                const cityKeysArray = Object.keys(cityInfos);
-                                for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
-                                    const cityKey = cityKeysArray[keyIndex];
-                                    const cityData = cityInfos[cityKey];
-                                    const pickedPosition = pickedEntity.position.getValue();
-                                    const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
-                                    const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
-                                    const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
-                                    if (positionDistance < 100) {
-                                        if (popupContentElement) {
-                                            popupContentElement.innerHTML = cityData.name;
-                                        }
-                                        if (popupElement) {
-                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
-                                            if (screenPosition) {
-                                                popupElement.style.position = 'fixed';
-                                                popupElement.style.left = screenPosition.x + 'px';
-                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
-                                                popupElement.style.bottom = 'auto';
-                                                popupElement.style.display = 'block';
-                                                popupElement.style.zIndex = '10000';
-                                            }
-                                        }
-                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                                        if (cesiumCanvasElement) {
-                                            cesiumCanvasElement.style.cursor = 'pointer';
-                                        }
-                                        break;
-                                    }
+                        if (cesiumActiveMarker && pickedEntity === cesiumActiveMarker) {
+                            foundActiveMarker = true;
+                            const markerPosition = cesiumActiveMarker.position.getValue();
+                            const markerCartographic = Cesium.Cartographic.fromCartesian(markerPosition);
+                            const markerLon = Cesium.Math.toDegrees(markerCartographic.longitude);
+                            const markerLat = Cesium.Math.toDegrees(markerCartographic.latitude);
+                            let markerLonlat = [markerLon, markerLat];
+                            if (cesiumActiveMarker.properties) {
+                                if (cesiumActiveMarker.properties.lonlat) {
+                                    markerLonlat = cesiumActiveMarker.properties.lonlat.getValue();
                                 }
-                                break;
+                            }
+                            if (popupContentElement) {
+                                const lonString = markerLonlat[0].toFixed(6);
+                                const latString = markerLonlat[1].toFixed(6);
+                                popupContentElement.innerHTML = "위치<br>경도: " + lonString + "<br>위도: " + latString;
+                            }
+                            if (popupElement) {
+                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
+                                if (screenPosition) {
+                                    popupElement.style.position = 'fixed';
+                                    popupElement.style.left = screenPosition.x + 'px';
+                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                    popupElement.style.bottom = 'auto';
+                                    popupElement.style.display = 'block';
+                                    popupElement.style.zIndex = '10000';
+                                }
+                            }
+                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                            if (cesiumCanvasElement) {
+                                cesiumCanvasElement.style.cursor = 'pointer';
+                            }
+                        } else {
+                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
+                                    foundCityEntity = true;
+                                    const cityKeysArray = Object.keys(cityInfos);
+                                    for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
+                                        const cityKey = cityKeysArray[keyIndex];
+                                        const cityData = cityInfos[cityKey];
+                                        const pickedPosition = pickedEntity.position.getValue();
+                                        const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
+                                        const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
+                                        const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
+                                        if (positionDistance < 100) {
+                                            if (popupContentElement) {
+                                                popupContentElement.innerHTML = cityData.name;
+                                            }
+                                            if (popupElement) {
+                                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                                if (screenPosition) {
+                                                    popupElement.style.position = 'fixed';
+                                                    popupElement.style.left = screenPosition.x + 'px';
+                                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                    popupElement.style.bottom = 'auto';
+                                                    popupElement.style.display = 'block';
+                                                    popupElement.style.zIndex = '10000';
+                                                }
+                                            }
+                                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                            if (cesiumCanvasElement) {
+                                                cesiumCanvasElement.style.cursor = 'pointer';
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
-                    if (foundCityEntity === false) {
+                    if (foundCityEntity === false && foundActiveMarker === false) {
                         if (popupElement) {
                             popupElement.style.display = 'none';
                         }
@@ -2026,21 +2151,24 @@ function toggle3D(is3DEnabled) {
                 const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
                 const cityEntityForCesium = cesiumViewer.entities.add({
                     position: cartesianPositionForCity,
-                    point: {
-                        pixelSize: 14,
-                        color: Cesium.Color.fromBytes(0, 123, 255, 255),
-                        outlineColor: Cesium.Color.WHITE,
-                        outlineWidth: 2,
-                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    billboard: {
+                        image: markerIconImageUrl,
+                        width: 32,
+                        height: 48,
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY
                     },
                     label: {
                         text: cityDataForCesium.name,
-                        font: '14px sans-serif',
+                        font: 'bold 13px sans-serif',
                         fillColor: Cesium.Color.WHITE,
                         outlineColor: Cesium.Color.BLACK,
-                        outlineWidth: 2,
+                        outlineWidth: 3,
                         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                        pixelOffset: new Cesium.Cartesian2(0, -30),
+                        showBackground: true,
+                        backgroundColor: Cesium.Color.fromBytes(0, 0, 0, 140),
+                        backgroundPadding: new Cesium.Cartesian2(6, 2),
+                        pixelOffset: new Cesium.Cartesian2(0, -34),
                         disableDepthTestDistance: Number.POSITIVE_INFINITY,
                         verticalOrigin: Cesium.VerticalOrigin.BOTTOM
                     }
@@ -2443,7 +2571,7 @@ function handleAreaClick3DFunction(clickEvent) {
     } else {
         displayText = longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
     }
-
+    
     if (cesiumViewer) {
         if (areaPointsArray.length >= 3) {
             const totalAreaNow = calculateCesiumArea();
