@@ -104,17 +104,6 @@ const cityPointStyle = function(feature) {
         src: markerIconImageUrl,
         anchor: [0.5, 1],
         scale: 1
-      }),
-      text: new ol.style.Text({
-        text: cityName,
-        textAlign: "center",
-        offsetY: -34,
-        font: "bold 13px sans-serif",
-        fill: new ol.style.Fill({ color: "#ffffff" }),
-        stroke: new ol.style.Stroke({ color: "#000000", width: 3 }),
-        backgroundFill: new ol.style.Fill({ color: "rgba(0, 0, 0, 0.55)" }),
-        backgroundStroke: new ol.style.Stroke({ color: "rgba(0, 0, 0, 0.55)", width: 1 }),
-        padding: [2, 6, 2, 6]
       })
     });
   
@@ -199,6 +188,7 @@ function handlePointerMoveEvent(event) {
     });
 
     const popupContentElement = document.getElementById("popup-content");
+    
     if (featureAtPixel) {
         const featureType = featureAtPixel.get("type");
         if (featureType === "city") {
@@ -1918,6 +1908,7 @@ function toggle3D(is3DEnabled) {
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
                     let foundActiveMarker = false;
+                    
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
                         if (cesiumActiveMarker && pickedEntity === cesiumActiveMarker) {
@@ -1944,8 +1935,11 @@ function toggle3D(is3DEnabled) {
                                     popupElement.style.left = screenPosition.x + 'px';
                                     popupElement.style.top = (screenPosition.y - 30) + 'px';
                                     popupElement.style.bottom = 'auto';
+                                    popupElement.style.right = 'auto';
+                                    popupElement.style.transform = 'translateX(-50%)';
                                     popupElement.style.display = 'block';
                                     popupElement.style.zIndex = '10000';
+                                    popupElement.className = 'ol-popup';
                                 }
                             }
                             const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -1953,51 +1947,219 @@ function toggle3D(is3DEnabled) {
                                 cesiumCanvasElement.style.cursor = 'pointer';
                             }
                         } else {
-                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
-                                if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
-                                    foundCityEntity = true;
-                                    const cityKeysArray = Object.keys(cityInfos);
-                                    for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
-                                        const cityKey = cityKeysArray[keyIndex];
-                                        const cityData = cityInfos[cityKey];
-                                        const pickedPosition = pickedEntity.position.getValue();
-                                        const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
-                                        const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
-                                        const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
-                                        if (positionDistance < 100) {
-                                            if (popupContentElement) {
-                                                popupContentElement.innerHTML = cityData.name;
-                                            }
-                                            if (popupElement) {
-                                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
-                                                if (screenPosition) {
-                                                    popupElement.style.position = 'fixed';
-                                                    popupElement.style.left = screenPosition.x + 'px';
-                                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
-                                                    popupElement.style.bottom = 'auto';
-                                                    popupElement.style.display = 'block';
-                                                    popupElement.style.zIndex = '10000';
-                                                }
-                                            }
-                                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                                            if (cesiumCanvasElement) {
-                                                cesiumCanvasElement.style.cursor = 'pointer';
-                                            }
-                                            break;
-                                        }
+                            let pickedEntityType = null;
+                            let pickedEntityName = null;
+                            if (pickedEntity.properties) {
+                                if (pickedEntity.properties.type) {
+                                    pickedEntityType = pickedEntity.properties.type.getValue();
+                                }
+                                if (pickedEntity.properties.name) {
+                                    pickedEntityName = pickedEntity.properties.name.getValue();
+                                }
+                            }
+                            if (pickedEntityType === "city") {
+                                foundCityEntity = true;
+                                if (pickedEntity.label) {
+                                    pickedEntity.label.show = true;
+                                }
+                                if (popupContentElement) {
+                                    popupContentElement.innerHTML = pickedEntityName || "";
+                                }
+                                const pickedPosition = pickedEntity.position.getValue();
+                                if (popupElement) {
+                                    const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                    if (screenPosition) {
+                                        popupElement.style.position = 'fixed';
+                                        popupElement.style.left = screenPosition.x + 'px';
+                                        popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                        popupElement.style.bottom = 'auto';
+                                        popupElement.style.right = 'auto';
+                                        popupElement.style.transform = 'translateX(-50%)';
+                                        popupElement.style.display = 'block';
+                                        popupElement.style.zIndex = '10000';
+                                        popupElement.className = 'ol-popup';
                                     }
-                                    break;
+                                }
+                                const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                if (cesiumCanvasElement) {
+                                    cesiumCanvasElement.style.cursor = 'pointer';
+                                }
+                            } else {
+                                for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                    if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
+                                        foundCityEntity = true;
+                                        if (pickedEntity.label) {
+                                            pickedEntity.label.show = true;
+                                        }
+                                        let cityNameForTooltip = "";
+                                        if (pickedEntity.properties && pickedEntity.properties.name) {
+                                            cityNameForTooltip = pickedEntity.properties.name.getValue();
+                                        }
+                                        if (popupContentElement) {
+                                            popupContentElement.innerHTML = cityNameForTooltip;
+                                        }
+                                        const pickedPosition = pickedEntity.position.getValue();
+                                        if (popupElement) {
+                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                            if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
+                                                popupElement.style.left = screenPosition.x + 'px';
+                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
+                                                popupElement.style.right = 'auto';
+                                                popupElement.style.transform = 'translateX(-50%)';
+                                                popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
+                                                popupElement.className = 'ol-popup';
+                                            }
+                                        }
+                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                        if (cesiumCanvasElement) {
+                                            cesiumCanvasElement.style.cursor = 'pointer';
+                                        }
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
+                    
                     if (foundCityEntity === false && foundActiveMarker === false) {
-                        if (popupElement) {
-                            popupElement.style.display = 'none';
+                        const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
+                        if (pickedCartesian) {
+                            const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
+                            const mouseLon = Cesium.Math.toDegrees(cartographicPosition.longitude);
+                            const mouseLat = Cesium.Math.toDegrees(cartographicPosition.latitude);
+                            let closestCityEntity = null;
+                            let closestDistance = 0.01;
+                            
+                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                                if (currentCityEntity) {
+                                    const cityPosition = currentCityEntity.position.getValue();
+                                    const cityCartographic = Cesium.Cartographic.fromCartesian(cityPosition);
+                                    const cityLon = Cesium.Math.toDegrees(cityCartographic.longitude);
+                                    const cityLat = Cesium.Math.toDegrees(cityCartographic.latitude);
+                                    
+                                    const distanceLon = Math.abs(mouseLon - cityLon);
+                                    const distanceLat = Math.abs(mouseLat - cityLat);
+                                    const totalDistance = Math.sqrt(distanceLon * distanceLon + distanceLat * distanceLat);
+                                    
+                                    if (totalDistance < closestDistance) {
+                                        closestDistance = totalDistance;
+                                        closestCityEntity = currentCityEntity;
+                                    }
+                                }
+                            }
+                            
+                            if (closestCityEntity) {
+                                foundCityEntity = true;
+                                if (closestCityEntity.label) {
+                                    closestCityEntity.label.show = true;
+                                }
+                                let cityNameForPopup = "";
+                                if (closestCityEntity.properties && closestCityEntity.properties.name) {
+                                    cityNameForPopup = closestCityEntity.properties.name.getValue();
+                                }
+                                if (popupContentElement) {
+                                    popupContentElement.innerHTML = cityNameForPopup;
+                                }
+                                const cityPosition = closestCityEntity.position.getValue();
+                                if (popupElement) {
+                                    const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, cityPosition);
+                                    if (screenPosition) {
+                                        popupElement.style.position = 'fixed';
+                                        popupElement.style.left = screenPosition.x + 'px';
+                                        popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                        popupElement.style.bottom = 'auto';
+                                        popupElement.style.right = 'auto';
+                                        popupElement.style.transform = 'translateX(-50%)';
+                                        popupElement.style.display = 'block';
+                                        popupElement.style.zIndex = '10000';
+                                        popupElement.className = 'ol-popup';
+                                    }
+                                }
+                                const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                if (cesiumCanvasElement) {
+                                    cesiumCanvasElement.style.cursor = 'pointer';
+                                }
+                            }
                         }
-                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                        if (cesiumCanvasElement) {
-                            cesiumCanvasElement.style.cursor = '';
+                        
+                        if (foundCityEntity === false) {
+                            if (cesiumActiveMarker) {
+                                const markerPosition = cesiumActiveMarker.position.getValue();
+                                const markerCartographic = Cesium.Cartographic.fromCartesian(markerPosition);
+                                const markerLon = Cesium.Math.toDegrees(markerCartographic.longitude);
+                                const markerLat = Cesium.Math.toDegrees(markerCartographic.latitude);
+                                const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
+                                if (pickedCartesian) {
+                                    const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
+                                    const mouseLon = Cesium.Math.toDegrees(cartographicPosition.longitude);
+                                    const mouseLat = Cesium.Math.toDegrees(cartographicPosition.latitude);
+                                    const distanceLon = Math.abs(mouseLon - markerLon);
+                                    const distanceLat = Math.abs(mouseLat - markerLat);
+                                    const totalDistance = Math.sqrt(distanceLon * distanceLon + distanceLat * distanceLat);
+                                    if (totalDistance < 0.01) {
+                                        foundActiveMarker = true;
+                                        let markerLonlat = [markerLon, markerLat];
+                                        if (cesiumActiveMarker.properties && cesiumActiveMarker.properties.lonlat) {
+                                            markerLonlat = cesiumActiveMarker.properties.lonlat.getValue();
+                                        }
+                                        if (popupContentElement) {
+                                            const lonString = markerLonlat[0].toFixed(6);
+                                            const latString = markerLonlat[1].toFixed(6);
+                                            popupContentElement.innerHTML = "위치<br>경도: " + lonString + "<br>위도: " + latString;
+                                        }
+                                        if (popupElement) {
+                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
+                                            if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
+                                                popupElement.style.left = screenPosition.x + 'px';
+                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
+                                                popupElement.style.right = 'auto';
+                                                popupElement.style.transform = 'translateX(-50%)';
+                                                popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
+                                                popupElement.className = 'ol-popup';
+                                            }
+                                        }
+                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                        if (cesiumCanvasElement) {
+                                            cesiumCanvasElement.style.cursor = 'pointer';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                            const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                            if (currentCityEntity && currentCityEntity.label) {
+                                if (foundCityEntity === false || currentCityEntity !== closestCityEntity) {
+                                    currentCityEntity.label.show = false;
+                                }
+                            }
+                        }
+                        
+                        if (foundCityEntity === false && foundActiveMarker === false) {
+                            if (popupElement) {
+                                popupElement.style.display = 'none';
+                            }
+                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                            if (cesiumCanvasElement) {
+                                cesiumCanvasElement.style.cursor = '';
+                            }
+                        }
+                    } else {
+                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                            const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                            if (currentCityEntity && currentCityEntity.label) {
+                                if (!foundCityEntity) {
+                                    currentCityEntity.label.show = false;
+                                }
+                            }
                         }
                     }
                 }
@@ -2036,6 +2198,7 @@ function toggle3D(is3DEnabled) {
                     const popupElement = document.getElementById("popup");
                     let foundCityEntity = false;
                     let foundActiveMarker = false;
+                    
                     if (pickedObject && pickedObject.id) {
                         const pickedEntity = pickedObject.id;
                         if (cesiumActiveMarker && pickedEntity === cesiumActiveMarker) {
@@ -2062,8 +2225,11 @@ function toggle3D(is3DEnabled) {
                                     popupElement.style.left = screenPosition.x + 'px';
                                     popupElement.style.top = (screenPosition.y - 30) + 'px';
                                     popupElement.style.bottom = 'auto';
+                                    popupElement.style.right = 'auto';
+                                    popupElement.style.transform = 'translateX(-50%)';
                                     popupElement.style.display = 'block';
                                     popupElement.style.zIndex = '10000';
+                                    popupElement.className = 'ol-popup';
                                 }
                             }
                             const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -2071,51 +2237,219 @@ function toggle3D(is3DEnabled) {
                                 cesiumCanvasElement.style.cursor = 'pointer';
                             }
                         } else {
-                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
-                                if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
-                                    foundCityEntity = true;
-                                    const cityKeysArray = Object.keys(cityInfos);
-                                    for (let keyIndex = 0; keyIndex < cityKeysArray.length; keyIndex = keyIndex + 1) {
-                                        const cityKey = cityKeysArray[keyIndex];
-                                        const cityData = cityInfos[cityKey];
-                                        const pickedPosition = pickedEntity.position.getValue();
-                                        const cartographicPositionForCity = Cesium.Cartographic.fromDegrees(cityData.lonlat[0], cityData.lonlat[1]);
-                                        const cartesianPositionForCity = Cesium.Cartesian3.fromRadians(cartographicPositionForCity.longitude, cartographicPositionForCity.latitude);
-                                        const positionDistance = Cesium.Cartesian3.distance(pickedPosition, cartesianPositionForCity);
-                                        if (positionDistance < 100) {
-                                            if (popupContentElement) {
-                                                popupContentElement.innerHTML = cityData.name;
-                                            }
-                                            if (popupElement) {
-                                                const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
-                                                if (screenPosition) {
-                                                    popupElement.style.position = 'fixed';
-                                                    popupElement.style.left = screenPosition.x + 'px';
-                                                    popupElement.style.top = (screenPosition.y - 30) + 'px';
-                                                    popupElement.style.bottom = 'auto';
-                                                    popupElement.style.display = 'block';
-                                                    popupElement.style.zIndex = '10000';
-                                                }
-                                            }
-                                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                                            if (cesiumCanvasElement) {
-                                                cesiumCanvasElement.style.cursor = 'pointer';
-                                            }
-                                            break;
-                                        }
+                            let pickedEntityType = null;
+                            let pickedEntityName = null;
+                            if (pickedEntity.properties) {
+                                if (pickedEntity.properties.type) {
+                                    pickedEntityType = pickedEntity.properties.type.getValue();
+                                }
+                                if (pickedEntity.properties.name) {
+                                    pickedEntityName = pickedEntity.properties.name.getValue();
+                                }
+                            }
+                            if (pickedEntityType === "city") {
+                                foundCityEntity = true;
+                                if (pickedEntity.label) {
+                                    pickedEntity.label.show = true;
+                                }
+                                if (popupContentElement) {
+                                    popupContentElement.innerHTML = pickedEntityName || "";
+                                }
+                                const pickedPosition = pickedEntity.position.getValue();
+                                if (popupElement) {
+                                    const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                    if (screenPosition) {
+                                        popupElement.style.position = 'fixed';
+                                        popupElement.style.left = screenPosition.x + 'px';
+                                        popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                        popupElement.style.bottom = 'auto';
+                                        popupElement.style.right = 'auto';
+                                        popupElement.style.transform = 'translateX(-50%)';
+                                        popupElement.style.display = 'block';
+                                        popupElement.style.zIndex = '10000';
+                                        popupElement.className = 'ol-popup';
                                     }
-                                    break;
+                                }
+                                const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                if (cesiumCanvasElement) {
+                                    cesiumCanvasElement.style.cursor = 'pointer';
+                                }
+                            } else {
+                                for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                    if (cesiumCityEntitiesArray[cityIndex] === pickedEntity) {
+                                        foundCityEntity = true;
+                                        if (pickedEntity.label) {
+                                            pickedEntity.label.show = true;
+                                        }
+                                        let cityNameForTooltip = "";
+                                        if (pickedEntity.properties && pickedEntity.properties.name) {
+                                            cityNameForTooltip = pickedEntity.properties.name.getValue();
+                                        }
+                                        if (popupContentElement) {
+                                            popupContentElement.innerHTML = cityNameForTooltip;
+                                        }
+                                        const pickedPosition = pickedEntity.position.getValue();
+                                        if (popupElement) {
+                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, pickedPosition);
+                                            if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
+                                                popupElement.style.left = screenPosition.x + 'px';
+                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
+                                                popupElement.style.right = 'auto';
+                                                popupElement.style.transform = 'translateX(-50%)';
+                                                popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
+                                                popupElement.className = 'ol-popup';
+                                            }
+                                        }
+                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                        if (cesiumCanvasElement) {
+                                            cesiumCanvasElement.style.cursor = 'pointer';
+                                        }
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
+                    
                     if (foundCityEntity === false && foundActiveMarker === false) {
-                        if (popupElement) {
-                            popupElement.style.display = 'none';
+                        const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
+                        if (pickedCartesian) {
+                            const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
+                            const mouseLon = Cesium.Math.toDegrees(cartographicPosition.longitude);
+                            const mouseLat = Cesium.Math.toDegrees(cartographicPosition.latitude);
+                            let closestCityEntity = null;
+                            let closestDistance = 0.01;
+                            
+                            for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                                const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                                if (currentCityEntity) {
+                                    const cityPosition = currentCityEntity.position.getValue();
+                                    const cityCartographic = Cesium.Cartographic.fromCartesian(cityPosition);
+                                    const cityLon = Cesium.Math.toDegrees(cityCartographic.longitude);
+                                    const cityLat = Cesium.Math.toDegrees(cityCartographic.latitude);
+                                    
+                                    const distanceLon = Math.abs(mouseLon - cityLon);
+                                    const distanceLat = Math.abs(mouseLat - cityLat);
+                                    const totalDistance = Math.sqrt(distanceLon * distanceLon + distanceLat * distanceLat);
+                                    
+                                    if (totalDistance < closestDistance) {
+                                        closestDistance = totalDistance;
+                                        closestCityEntity = currentCityEntity;
+                                    }
+                                }
+                            }
+                            
+                            if (closestCityEntity) {
+                                foundCityEntity = true;
+                                if (closestCityEntity.label) {
+                                    closestCityEntity.label.show = true;
+                                }
+                                let cityNameForPopup = "";
+                                if (closestCityEntity.properties && closestCityEntity.properties.name) {
+                                    cityNameForPopup = closestCityEntity.properties.name.getValue();
+                                }
+                                if (popupContentElement) {
+                                    popupContentElement.innerHTML = cityNameForPopup;
+                                }
+                                const cityPosition = closestCityEntity.position.getValue();
+                                if (popupElement) {
+                                    const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, cityPosition);
+                                    if (screenPosition) {
+                                        popupElement.style.position = 'fixed';
+                                        popupElement.style.left = screenPosition.x + 'px';
+                                        popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                        popupElement.style.bottom = 'auto';
+                                        popupElement.style.right = 'auto';
+                                        popupElement.style.transform = 'translateX(-50%)';
+                                        popupElement.style.display = 'block';
+                                        popupElement.style.zIndex = '10000';
+                                        popupElement.className = 'ol-popup';
+                                    }
+                                }
+                                const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                if (cesiumCanvasElement) {
+                                    cesiumCanvasElement.style.cursor = 'pointer';
+                                }
+                            }
                         }
-                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
-                        if (cesiumCanvasElement) {
-                            cesiumCanvasElement.style.cursor = '';
+                        
+                        if (foundCityEntity === false) {
+                            if (cesiumActiveMarker) {
+                                const markerPosition = cesiumActiveMarker.position.getValue();
+                                const markerCartographic = Cesium.Cartographic.fromCartesian(markerPosition);
+                                const markerLon = Cesium.Math.toDegrees(markerCartographic.longitude);
+                                const markerLat = Cesium.Math.toDegrees(markerCartographic.latitude);
+                                const pickedCartesian = cesiumViewer.camera.pickEllipsoid(movementEvent.endPosition, cesiumViewer.scene.globe.ellipsoid);
+                                if (pickedCartesian) {
+                                    const cartographicPosition = Cesium.Cartographic.fromCartesian(pickedCartesian);
+                                    const mouseLon = Cesium.Math.toDegrees(cartographicPosition.longitude);
+                                    const mouseLat = Cesium.Math.toDegrees(cartographicPosition.latitude);
+                                    const distanceLon = Math.abs(mouseLon - markerLon);
+                                    const distanceLat = Math.abs(mouseLat - markerLat);
+                                    const totalDistance = Math.sqrt(distanceLon * distanceLon + distanceLat * distanceLat);
+                                    if (totalDistance < 0.01) {
+                                        foundActiveMarker = true;
+                                        let markerLonlat = [markerLon, markerLat];
+                                        if (cesiumActiveMarker.properties && cesiumActiveMarker.properties.lonlat) {
+                                            markerLonlat = cesiumActiveMarker.properties.lonlat.getValue();
+                                        }
+                                        if (popupContentElement) {
+                                            const lonString = markerLonlat[0].toFixed(6);
+                                            const latString = markerLonlat[1].toFixed(6);
+                                            popupContentElement.innerHTML = "위치<br>경도: " + lonString + "<br>위도: " + latString;
+                                        }
+                                        if (popupElement) {
+                                            const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
+                                            if (screenPosition) {
+                                                popupElement.style.position = 'fixed';
+                                                popupElement.style.left = screenPosition.x + 'px';
+                                                popupElement.style.top = (screenPosition.y - 30) + 'px';
+                                                popupElement.style.bottom = 'auto';
+                                                popupElement.style.right = 'auto';
+                                                popupElement.style.transform = 'translateX(-50%)';
+                                                popupElement.style.display = 'block';
+                                                popupElement.style.zIndex = '10000';
+                                                popupElement.className = 'ol-popup';
+                                            }
+                                        }
+                                        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                                        if (cesiumCanvasElement) {
+                                            cesiumCanvasElement.style.cursor = 'pointer';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                            const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                            if (currentCityEntity && currentCityEntity.label) {
+                                if (foundCityEntity === false || currentCityEntity !== closestCityEntity) {
+                                    currentCityEntity.label.show = false;
+                                }
+                            }
+                        }
+                        
+                        if (foundCityEntity === false && foundActiveMarker === false) {
+                            if (popupElement) {
+                                popupElement.style.display = 'none';
+                            }
+                            const cesiumCanvasElement = cesiumViewer.scene.canvas;
+                            if (cesiumCanvasElement) {
+                                cesiumCanvasElement.style.cursor = '';
+                            }
+                        }
+                    } else {
+                        for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
+                            const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
+                            if (currentCityEntity && currentCityEntity.label) {
+                                if (!foundCityEntity) {
+                                    currentCityEntity.label.show = false;
+                                }
+                            }
                         }
                     }
                 }
@@ -2161,16 +2495,22 @@ function toggle3D(is3DEnabled) {
                     label: {
                         text: cityDataForCesium.name,
                         font: 'bold 13px sans-serif',
-                        fillColor: Cesium.Color.WHITE,
-                        outlineColor: Cesium.Color.BLACK,
-                        outlineWidth: 3,
+                        fillColor: Cesium.Color.BLACK,
+                        outlineColor: Cesium.Color.WHITE,
+                        outlineWidth: 1,
                         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
                         showBackground: true,
-                        backgroundColor: Cesium.Color.fromBytes(0, 0, 0, 140),
+                        backgroundColor: Cesium.Color.WHITE,
                         backgroundPadding: new Cesium.Cartesian2(6, 2),
                         pixelOffset: new Cesium.Cartesian2(0, -34),
                         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        show: false
+                    },
+                    properties: {
+                        type: "city",
+                        name: cityDataForCesium.name,
+                        lonlat: cityDataForCesium.lonlat
                     }
                 });
                 cesiumCityEntitiesArray.push(cityEntityForCesium);

@@ -240,6 +240,17 @@ body.topbar-hidden #map, body.topbar-hidden #cesiumContainer { top: 0; }
   pointer-events: none;
 }
 
+.ol-popup[style*="position: fixed"] {
+  background: #fff;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  min-width: 100px;
+  text-align: center;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+  transform: translateX(-50%);
+}
+
 .cesium-selection-wrapper {
   display: none !important;
 }
@@ -379,3 +390,4 @@ body.topbar-hidden #map, body.topbar-hidden #cesiumContainer { top: 0; }
 .tab-footer-icons button:nth-child(2):hover {
   background-color: #ffd0d9;
 }
+
