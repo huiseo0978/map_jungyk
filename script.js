@@ -145,6 +145,7 @@ let cesiumCityEntitiesArray = [];
 let cesiumActiveMarker = null;
 let cesiumEventHandler = null;
 let isSyncingZoom = false;
+let last2DZoomLevel = null;
 
 const popupElement = document.getElementById("popup");
 const cityPopup = new ol.Overlay({
@@ -247,6 +248,11 @@ map.getView().on('change:resolution', function() {
         levelInfoElement.innerText = "줌 레벨: " + roundedZoom;
     }
     
+    const currentZoom = mainView.getZoom();
+    if (currentZoom !== undefined && currentZoom !== null) {
+        last2DZoomLevel = currentZoom;
+    }
+    
     if (isSyncingZoom) {
         return;
     }
@@ -262,12 +268,12 @@ map.getView().on('change:resolution', function() {
             const cesiumFOV = Math.PI / 3;
             const tanHalfFOV = Math.tan(cesiumFOV / 2);
             
-            let viewportHeightInPixels = 512;
+            let viewportHeight = 512;
             if (mapSize && mapSize[1] > 0) {
-                viewportHeightInPixels = mapSize[1];
+                viewportHeight = mapSize[1];
             }
             
-            const viewportHeightInMeters = metersPerPixel * viewportHeightInPixels;
+            const viewportHeightInMeters = metersPerPixel * viewportHeight;
             const targetHeight = viewportHeightInMeters / (2 * tanHalfFOV);
             const clampedHeight = Math.max(100, Math.min(40000000, targetHeight));
             
@@ -1875,28 +1881,29 @@ function toggle3D(is3DEnabled) {
             }
             const currentZoom = mainView.getZoom();
             if (currentZoom !== undefined && currentZoom !== null) {
+                last2DZoomLevel = currentZoom;
+                
                 const latitudeRadians = targetLonlat[1] * Math.PI / 180;
                 const metersPerPixelAtEquator = 156543.03392;
                 const mapSize = map.getSize();
                 const cesiumFOV = Math.PI / 3;
                 const tanHalfFOV = Math.tan(cesiumFOV / 2);
                 
-                let viewportHeightInPixels = 512;
+                let viewportHeight = 512;
                 if (mapSize && mapSize[1] > 0) {
-                    viewportHeightInPixels = mapSize[1];
+                    viewportHeight = mapSize[1];
                 }
                 
                 const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians) / Math.pow(2, currentZoom);
-                const viewportHeightInMeters = metersPerPixel * viewportHeightInPixels;
+                const viewportHeightInMeters = metersPerPixel * viewportHeight;
                 const calculatedHeight = viewportHeightInMeters / (2 * tanHalfFOV);
                 
-                targetHeight = calculatedHeight;
-                
-                if (targetHeight < 100) {
+                if (calculatedHeight < 100) {
                     targetHeight = 100;
-                }
-                if (targetHeight > 40000000) {
+                } else if (calculatedHeight > 40000000) {
                     targetHeight = 40000000;
+                } else {
+                    targetHeight = calculatedHeight;
                 }
             }
         }
@@ -1950,8 +1957,9 @@ function toggle3D(is3DEnabled) {
             }
 
             isSyncingZoom = true;
+            const destinationCartesian = Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight);
             cesiumViewer.camera.setView({
-                destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
+                destination: destinationCartesian,
                 orientation: {
                     heading: Cesium.Math.toRadians(0),
                     pitch: Cesium.Math.toRadians(-45),
@@ -1959,7 +1967,20 @@ function toggle3D(is3DEnabled) {
                 }
             });
             setTimeout(function() {
-                isSyncingZoom = false;
+                const actualHeight = cesiumViewer.camera.positionCartographic.height;
+                if (Math.abs(actualHeight - targetHeight) > 1) {
+                    cesiumViewer.camera.setView({
+                        destination: destinationCartesian,
+                        orientation: {
+                            heading: Cesium.Math.toRadians(0),
+                            pitch: Cesium.Math.toRadians(-45),
+                            roll: 0.0
+                        }
+                    });
+                }
+                setTimeout(function() {
+                    isSyncingZoom = false;
+                }, 2000);
             }, 1500);
             
             cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
@@ -1983,7 +2004,6 @@ function toggle3D(is3DEnabled) {
                     const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
                     const latitudeRadians = cameraPosition.latitude;
                     const metersPerPixelAtEquator = 156543.03392;
-                    const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
                     const mapSize = map.getSize();
                     const cesiumFOV = Math.PI / 3;
                     const tanHalfFOV = Math.tan(cesiumFOV / 2);
@@ -1995,7 +2015,8 @@ function toggle3D(is3DEnabled) {
                     
                     const viewportHeightInMeters = cameraHeight * 2 * tanHalfFOV;
                     const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
-                    let targetZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
+                    const metersPerPixelAtZoom0 = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+                    let targetZoom = Math.log2(metersPerPixelAtZoom0 / metersPerPixelAtCurrentHeight);
                     if (targetZoom < 0) {
                         targetZoom = 0;
                     }
@@ -2332,18 +2353,20 @@ function toggle3D(is3DEnabled) {
                             const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
                             const latitudeRadians = cameraPosition.latitude;
                             const metersPerPixelAtEquator = 156543.03392;
-                            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
                             const mapSize = map.getSize();
-                            let targetZoom = 13;
+                            const cesiumFOV = Math.PI / 3;
+                            const tanHalfFOV = Math.tan(cesiumFOV / 2);
+                            
+                            let viewportHeight = 512;
                             if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
-                                const viewportHeight = mapSize[1];
-                                const viewportHeightInMeters = cameraHeight * 2 * Math.tan(cesiumViewer.camera.frustum.fov / 2);
-                                const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
-                                targetZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
-                            } else {
-                                const estimatedMetersPerPixel = cameraHeight / 256;
-                                targetZoom = Math.log2(metersPerPixel / estimatedMetersPerPixel);
+                                viewportHeight = mapSize[1];
                             }
+                            
+                            const viewportHeightInMeters = cameraHeight * 2 * tanHalfFOV;
+                            const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
+                            const metersPerPixelAtZoom0 = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+                            let targetZoom = Math.log2(metersPerPixelAtZoom0 / metersPerPixelAtCurrentHeight);
+                            
                             if (targetZoom < 0) {
                                 targetZoom = 0;
                             }
@@ -2351,16 +2374,21 @@ function toggle3D(is3DEnabled) {
                                 targetZoom = 20;
                             }
                             
-                            isSyncingZoom = true;
-                            const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
-                            mainView.animate({
-                                center: coordinate,
-                                zoom: targetZoom,
-                                duration: 300
-                            });
-                            setTimeout(function() {
-                                isSyncingZoom = false;
-                            }, 400);
+                            const currentZoom = mainView.getZoom();
+                            const zoomDifference = Math.abs(targetZoom - currentZoom);
+                            
+                            if (zoomDifference > 0.01) {
+                                isSyncingZoom = true;
+                                const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
+                                mainView.animate({
+                                    center: coordinate,
+                                    zoom: targetZoom,
+                                    duration: 300
+                                });
+                                setTimeout(function() {
+                                    isSyncingZoom = false;
+                                }, 400);
+                            }
                         }
                     });
                 }
@@ -2709,12 +2737,26 @@ function toggle3D(is3DEnabled) {
         
         if (cesiumViewer && !cesiumViewer.isDestroyed()) {
             isSyncingZoom = true;
+            const destinationCartesian = Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight);
             cesiumViewer.camera.flyTo({
-                destination: Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight),
+                destination: destinationCartesian,
                 duration: 0.5
             });
             setTimeout(function() {
-                isSyncingZoom = false;
+                const actualHeight = cesiumViewer.camera.positionCartographic.height;
+                if (Math.abs(actualHeight - targetHeight) > 1) {
+                    cesiumViewer.camera.setView({
+                        destination: destinationCartesian,
+                        orientation: {
+                            heading: Cesium.Math.toRadians(0),
+                            pitch: Cesium.Math.toRadians(-45),
+                            roll: 0.0
+                        }
+                    });
+                }
+                setTimeout(function() {
+                    isSyncingZoom = false;
+                }, 2000);
             }, 1500);
         }
     }
@@ -2892,30 +2934,34 @@ function toggle3D(is3DEnabled) {
                 Cesium.Math.toDegrees(cameraPosition.longitude),
                 Cesium.Math.toDegrees(cameraPosition.latitude)
             ];
-            const cameraHeight = cameraPosition.height;
-            const latitudeRadians = cameraPosition.latitude;
-            const metersPerPixelAtEquator = 156543.03392;
-            const mapSize = map.getSize();
-            const cesiumFOV = Math.PI / 3;
-            const tanHalfFOV = Math.tan(cesiumFOV / 2);
             
-            let viewportHeight = 512;
-            if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
-                viewportHeight = mapSize[1];
-            }
-            
-            const viewportHeightInMeters = cameraHeight * 2 * tanHalfFOV;
-            const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
-            const metersPerPixel = metersPerPixelAtEquator * Math.cos(latitudeRadians);
-            const calculatedZoom = Math.log2(metersPerPixel / metersPerPixelAtCurrentHeight);
-            
-            targetZoom = calculatedZoom;
-            
-            if (targetZoom < 0) {
-                targetZoom = 0;
-            }
-            if (targetZoom > 20) {
-                targetZoom = 20;
+            if (last2DZoomLevel !== null && last2DZoomLevel !== undefined) {
+                targetZoom = last2DZoomLevel;
+            } else {
+                const cameraHeight = cameraPosition.height;
+                const latitudeRadians = cameraPosition.latitude;
+                const metersPerPixelAtEquator = 156543.03392;
+                const mapSize = map.getSize();
+                const cesiumFOV = Math.PI / 3;
+                const tanHalfFOV = Math.tan(cesiumFOV / 2);
+                
+                let viewportHeight = 512;
+                if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
+                    viewportHeight = mapSize[1];
+                }
+                
+                const viewportHeightInMeters = cameraHeight * 2 * tanHalfFOV;
+                const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
+                const metersPerPixelAtZoom0 = metersPerPixelAtEquator * Math.cos(latitudeRadians);
+                const calculatedZoom = Math.log2(metersPerPixelAtZoom0 / metersPerPixelAtCurrentHeight);
+                
+                if (calculatedZoom < 0) {
+                    targetZoom = 0;
+                } else if (calculatedZoom > 20) {
+                    targetZoom = 20;
+                } else {
+                    targetZoom = calculatedZoom;
+                }
             }
         }
         
@@ -2928,14 +2974,17 @@ function toggle3D(is3DEnabled) {
             if (map && mainView) {
                 isSyncingZoom = true;
                 const coordinate = ol.proj.fromLonLat(targetLonlat);
-                mainView.animate({
-                    center: coordinate,
-                    zoom: targetZoom,
-                    duration: 500
-                });
+                mainView.setCenter(coordinate);
+                mainView.setZoom(targetZoom);
                 setTimeout(function() {
-                    isSyncingZoom = false;
-                }, 1500);
+                    const actualZoom = mainView.getZoom();
+                    if (Math.abs(actualZoom - targetZoom) > 0.01) {
+                        mainView.setZoom(targetZoom);
+                    }
+                    setTimeout(function() {
+                        isSyncingZoom = false;
+                    }, 2000);
+                }, 500);
             }
         }
         
@@ -3142,7 +3191,7 @@ function toggle3D(is3DEnabled) {
     
     setTimeout(function() {
         isSyncingZoom = false;
-    }, 2000);
+    }, 4000);
 }
 
 const modeSwitch = document.getElementById("modeSwitch");
