@@ -46,3 +46,34 @@ function heightToZoom(cameraHeight, latitudeRadians, mapSize) {
     
     return targetZoom;
 }
+
+function sync3DTo2D(cameraHeight, cameraPosition) {
+    if (isSyncingZoom) {
+        return;
+    }
+    if (!is3DModeActive || typeof map === 'undefined' || !map || typeof mainView === 'undefined' || !mainView) {
+        return;
+    }
+    
+    const cameraLon = Cesium.Math.toDegrees(cameraPosition.longitude);
+    const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
+    const latitudeRadians = cameraPosition.latitude;
+    const mapSize = map.getSize();
+    const targetZoom = heightToZoom(cameraHeight, latitudeRadians, mapSize);
+    
+    const currentZoom = mainView.getZoom();
+    const zoomDifference = Math.abs(targetZoom - currentZoom);
+    
+    if (zoomDifference > 0.01) {
+        isSyncingZoom = true;
+        const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
+        mainView.animate({
+            center: coordinate,
+            zoom: targetZoom,
+            duration: 300
+        });
+        setTimeout(function() {
+            isSyncingZoom = false;
+        }, 400);
+    }
+}
