@@ -146,6 +146,7 @@ let cesiumActiveMarker = null;
 let cesiumEventHandler = null;
 let isSyncingZoom = false;
 let last2DZoomLevel = null;
+let modalZIndex = 1000;
 
 const popupElement = document.getElementById("popup");
 const cityPopup = new ol.Overlay({
@@ -318,8 +319,8 @@ function setMarker(lonlat) {
             if (cesiumActiveMarker) {
                 cesiumViewer.entities.remove(cesiumActiveMarker);
             }
-            const cartographicPosition = Cesium.Cartographic.fromDegrees(lonlat[0], lonlat[1]);
-            const cartesianPosition = Cesium.Cartesian3.fromRadians(cartographicPosition.longitude, cartographicPosition.latitude);
+            const cartographicPosition = Cesium.Cartographic.fromDegrees(lonlat[0], lonlat[1], 0);
+            const cartesianPosition = cesiumViewer.scene.globe.ellipsoid.cartographicToCartesian(cartographicPosition);
             cesiumActiveMarker = cesiumViewer.entities.add({
                 position: cartesianPosition,
                 billboard: {
@@ -420,7 +421,7 @@ let cesiumMeasureTooltipLabel = null;
 let isMoveModalOpen = false;
 let moveMapClickHandler = null;
 let cesiumMoveMapClickHandler = null;
-let lastMeasureResult = null;
+let lastMeasureResult = null; 
 
 let areaResultsArray = [];
 let isAreaMeasuringNow = false;
@@ -437,7 +438,10 @@ let lastAreaResult = null;
 function openMeasureModal() {
     const measureModalElement = document.getElementById("measureModal");
     if (measureModalElement) {
+        modalZIndex += 10;
+        measureModalElement.style.zIndex = modalZIndex;
         measureModalElement.style.display = "block";
+        bringModalToFront(measureModalElement);
     }
     setTimeout(function() {
         makeModalDraggable();
@@ -1549,7 +1553,10 @@ function clearMeasures() {
 function openMoveModal() {
     const moveModalElement = document.getElementById("moveModal");
     if (moveModalElement) {
+        modalZIndex += 10;
+        moveModalElement.style.zIndex = modalZIndex;
         moveModalElement.style.display = "block";
+        bringModalToFront(moveModalElement);
     }
     isMoveModalOpen = true;
     
@@ -1822,6 +1829,60 @@ function makeModalDraggable() {
         };
     }
 }
+
+function bringModalToFront(modalElement) {
+    modalZIndex += 1;
+    modalElement.style.zIndex = modalZIndex;
+}
+
+function getTopModal() {
+    const modals = document.querySelectorAll('.modal');
+    let topModal = null;
+    let topZIndex = 0;
+    for (let i = 0; i < modals.length; i++) {
+        const modal = modals[i];
+        if (modal.style.display === 'block') {
+            const zIndex = parseInt(window.getComputedStyle(modal).zIndex) || 0;
+            if (zIndex > topZIndex) {
+                topZIndex = zIndex;
+                topModal = modal;
+            }
+        }
+    }
+    return topModal;
+}
+
+function closeTopModal() {
+    const topModal = getTopModal();
+    if (topModal) {
+        const modalId = topModal.id;
+        if (modalId === 'moveModal') {
+            closeMoveModal();
+        } else if (modalId === 'measureModal') {
+            closeMeasureModal();
+        } else if (modalId === 'areaModal') {
+            closeAreaModal();
+        } else if (modalId === 'tabExampleModal') {
+            closeTabExampleModal();
+        }
+    }
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' || event.keyCode === 27) {
+        closeTopModal();
+    }
+});
+
+document.addEventListener('click', function(event) {
+    const clickedModal = event.target.closest('.modal');
+    if (clickedModal && clickedModal.style.display === 'block') {
+       if (!event.target.classList.contains('modal-close')) {
+            bringModalToFront(clickedModal);
+        }
+    }
+});
+
 makeModalDraggable();
 
 window.toggleTopbar = function() {
@@ -3315,7 +3376,10 @@ window.goCityZoom = function(cityName) {
 function openAreaModal() {
     const areaModalElement = document.getElementById("areaModal");
     if (areaModalElement) {
+        modalZIndex += 10;
+        areaModalElement.style.zIndex = modalZIndex;
         areaModalElement.style.display = "block";
+        bringModalToFront(areaModalElement);
     }
     setTimeout(function() {
         makeModalDraggable();
@@ -3967,22 +4031,103 @@ function removeAreaItem(itemId) {
     }
     
     const currentItem = areaResultsArray[foundIndex];
-    if (currentItem.feature) {
+    
+    if (currentItem.isPoint) {
         if (is3DModeActive) {
-            if (currentItem.feature && cesiumViewer) {
-                cesiumViewer.entities.remove(currentItem.feature);
+            if (cesiumViewer) {
+                if (currentItem.feature) {
+                    cesiumViewer.entities.remove(currentItem.feature);
+                }
             }
-            if (currentItem.labelEntity && cesiumViewer) {
-                cesiumViewer.entities.remove(currentItem.labelEntity);
+            
+            const removedCoord = currentItem.coord;
+            let removedPointIndex = -1;
+            
+            for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
+                if (areaPointsArray[pointIndex][0] === removedCoord[0] && areaPointsArray[pointIndex][1] === removedCoord[1]) {
+                    removedPointIndex = pointIndex;
+                    areaPointsArray.splice(pointIndex, 1);
+                    break;
+                }
             }
-            if (currentItem.labelEntity && cesiumViewer) {
-                cesiumViewer.entities.remove(currentItem.labelEntity);
-            }
-            if (currentItem.pointEntities) {
-                for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
-                    const currentEntity = currentItem.pointEntities[entityIndex];
-                    if (currentEntity && cesiumViewer) {
-                        cesiumViewer.entities.remove(currentEntity);
+            
+            if (removedPointIndex >= 0) {
+                if (removedPointIndex < cesiumAreaEntitiesArray.length) {
+                    const removedEntity = cesiumAreaEntitiesArray[removedPointIndex];
+                    if (removedEntity) {
+                        cesiumViewer.entities.remove(removedEntity);
+                    }
+                    cesiumAreaEntitiesArray.splice(removedPointIndex, 1);
+                }
+                
+                if (cesiumAreaPolygonEntity) {
+                    cesiumViewer.entities.remove(cesiumAreaPolygonEntity);
+                    cesiumAreaPolygonEntity = null;
+                }
+                if (cesiumAreaTooltipLabel) {
+                    cesiumViewer.entities.remove(cesiumAreaTooltipLabel);
+                    cesiumAreaTooltipLabel = null;
+                }
+                
+                if (areaPointsArray.length >= 3) {
+                    const positionsArray = [];
+                    for (let entityIndex = 0; entityIndex < cesiumAreaEntitiesArray.length; entityIndex = entityIndex + 1) {
+                        const currentEntity = cesiumAreaEntitiesArray[entityIndex];
+                        if (currentEntity) {
+                            positionsArray.push(currentEntity.position.getValue());
+                        }
+                    }
+                    if (positionsArray.length > 0) {
+                        positionsArray.push(positionsArray[0]);
+                    }
+                    
+                    cesiumAreaPolygonEntity = cesiumViewer.entities.add({
+                        polygon: {
+                            hierarchy: new Cesium.CallbackProperty(function() {
+                                return new Cesium.PolygonHierarchy(positionsArray);
+                            }, false),
+                            material: Cesium.Color.RED.withAlpha(0.3),
+                            outline: true,
+                            outlineColor: Cesium.Color.RED,
+                            height: 0,
+                            extrudedHeight: 0
+                        }
+                    });
+                    
+                    const totalArea = calculateCesiumArea();
+                    const areaText = formatCesiumArea(totalArea);
+                    
+                    if (cesiumAreaEntitiesArray.length > 0) {
+                        const lastEntity = cesiumAreaEntitiesArray[cesiumAreaEntitiesArray.length - 1];
+                        const lastPosition = lastEntity.position.getValue();
+                        cesiumAreaTooltipLabel = cesiumViewer.entities.add({
+                            position: lastPosition,
+                            label: {
+                                text: areaText,
+                                font: '12px sans-serif',
+                                fillColor: Cesium.Color.WHITE,
+                                outlineColor: Cesium.Color.BLACK,
+                                outlineWidth: 2,
+                                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                                pixelOffset: new Cesium.Cartesian2(0, -40),
+                                disableDepthTestDistance: Number.POSITIVE_INFINITY
+                            }
+                        });
+                    }
+                }
+                
+                for (let resultIndex = 0; resultIndex < areaResultsArray.length; resultIndex = resultIndex + 1) {
+                    const currentResultItem = areaResultsArray[resultIndex];
+                    if (currentResultItem.isPoint && currentResultItem.id !== itemId) {
+                        if (areaPointsArray.length >= 3) {
+                            const totalArea = calculateCesiumArea();
+                            const areaText = formatCesiumArea(totalArea);
+                            currentResultItem.text = areaText;
+                        } else {
+                            if (currentResultItem.coord) {
+                                currentResultItem.text = currentResultItem.coord[0].toFixed(4) + "," + currentResultItem.coord[1].toFixed(4);
+                            }
+                        }
                     }
                 }
             }
@@ -3990,7 +4135,104 @@ function removeAreaItem(itemId) {
             if (currentItem.feature) {
                 measureSource.removeFeature(currentItem.feature);
             }
-            if (currentItem.pointFeatures) {
+            
+            const removedCoord = currentItem.coord;
+            let removedPointIndex = -1;
+            
+            for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
+                const currentPointLonLat = ol.proj.toLonLat(areaPointsArray[pointIndex]);
+                if (currentPointLonLat[0] === removedCoord[0] && currentPointLonLat[1] === removedCoord[1]) {
+                    removedPointIndex = pointIndex;
+                    areaPointsArray.splice(pointIndex, 1);
+                    break;
+                }
+            }
+            
+            if (removedPointIndex >= 0) {
+                if (removedPointIndex < areaPointFeaturesArray.length) {
+                    const removedFeature = areaPointFeaturesArray[removedPointIndex];
+                    if (removedFeature) {
+                        measureSource.removeFeature(removedFeature);
+                    }
+                    areaPointFeaturesArray.splice(removedPointIndex, 1);
+                }
+                
+                if (areaCurrentPolygonFeature) {
+                    measureSource.removeFeature(areaCurrentPolygonFeature);
+                    areaCurrentPolygonFeature = null;
+                }
+                
+                if (areaPointsArray.length >= 3) {
+                    const polygonCoordinates = [];
+                    for (let pointIndex = 0; pointIndex < areaPointsArray.length; pointIndex = pointIndex + 1) {
+                        polygonCoordinates.push(areaPointsArray[pointIndex]);
+                    }
+                    polygonCoordinates.push(areaPointsArray[0]);
+                    const polygonGeometry = new ol.geom.Polygon([polygonCoordinates]);
+                    
+                    const areaPolygonStyleObject = new ol.style.Style({
+                        fill: new ol.style.Fill({
+                            color: 'rgba(255, 0, 0, 0.3)'
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: 'rgba(255, 0, 0, 1)',
+                            width: 2
+                        })
+                    });
+                    
+                    areaCurrentPolygonFeature = new ol.Feature({
+                        geometry: polygonGeometry
+                    });
+                    areaCurrentPolygonFeature.setStyle(areaPolygonStyleObject);
+                    measureSource.addFeature(areaCurrentPolygonFeature);
+                    
+                    const calculatedArea = formatArea(polygonGeometry);
+                    
+                    for (let resultIndex = 0; resultIndex < areaResultsArray.length; resultIndex = resultIndex + 1) {
+                        const currentResultItem = areaResultsArray[resultIndex];
+                        if (currentResultItem.isPoint && currentResultItem.id !== itemId) {
+                            currentResultItem.text = calculatedArea;
+                        }
+                    }
+                } else {
+                    for (let resultIndex = 0; resultIndex < areaResultsArray.length; resultIndex = resultIndex + 1) {
+                        const currentResultItem = areaResultsArray[resultIndex];
+                        if (currentResultItem.isPoint && currentResultItem.id !== itemId) {
+                            if (currentResultItem.coord) {
+                                currentResultItem.text = currentResultItem.coord[0].toFixed(4) + "," + currentResultItem.coord[1].toFixed(4);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+
+        areaResultsArray.splice(foundIndex, 1);
+        updateAreaListFunction();
+    } else {
+        if (is3DModeActive) {
+            if (cesiumViewer) {
+                if (currentItem.feature) {
+                    cesiumViewer.entities.remove(currentItem.feature);
+                }
+                if (currentItem.labelEntity) {
+                    cesiumViewer.entities.remove(currentItem.labelEntity);
+                }
+                if (currentItem.pointEntities && currentItem.pointEntities.length > 0) {
+                    for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
+                        const currentEntity = currentItem.pointEntities[entityIndex];
+                        if (currentEntity) {
+                            cesiumViewer.entities.remove(currentEntity);
+                        }
+                    }
+                }
+            }
+        } else {
+            if (currentItem.feature) {
+                measureSource.removeFeature(currentItem.feature);
+            }
+            if (currentItem.pointFeatures && currentItem.pointFeatures.length > 0) {
                 for (let featureIndex = 0; featureIndex < currentItem.pointFeatures.length; featureIndex = featureIndex + 1) {
                     const currentFeature = currentItem.pointFeatures[featureIndex];
                     if (currentFeature) {
@@ -3999,10 +4241,10 @@ function removeAreaItem(itemId) {
                 }
             }
         }
+        
+        areaResultsArray.splice(foundIndex, 1);
+        updateAreaListFunction();
     }
-    
-    areaResultsArray.splice(foundIndex, 1);
-    updateAreaListFunction();
 }
 
 function goToAreaEndPoint(itemId) {
@@ -4056,7 +4298,10 @@ window.goToAreaEndPoint = goToAreaEndPoint;
 function openTabExampleModal() {
     const tabExampleModalDiv = document.getElementById("tabExampleModal");
     if (tabExampleModalDiv != null) {
+        modalZIndex += 10;
+        tabExampleModalDiv.style.zIndex = modalZIndex;
         tabExampleModalDiv.style.display = "block";
+        bringModalToFront(tabExampleModalDiv);
         updateMeasureListFunction();
         updateAreaListFunction();
     }
