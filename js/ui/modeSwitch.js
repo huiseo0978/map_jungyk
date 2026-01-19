@@ -35,7 +35,7 @@ function toggle3D(is3DEnabled) {
                         const levelInfoElement = document.getElementById("level-info");
                         if (levelInfoElement) {
                             const roundedHeight = Math.round(cameraHeight);
-                            levelInfoElement.innerText = "?????: " + roundedHeight + "m";
+                            levelInfoElement.innerText = "위치: " + roundedHeight + "m";
                         }
                         
                         if (isSyncingZoom) {
@@ -79,7 +79,7 @@ function toggle3D(is3DEnabled) {
                     const latitudeDegrees = Cesium.Math.toDegrees(cartographicPosition.latitude);
                     const coordinateInfoElement = document.getElementById("coord-info");
                     if (coordinateInfoElement) {
-                        coordinateInfoElement.innerText = "?????: " + longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
+                        coordinateInfoElement.innerText = "위치: " + longitudeDegrees.toFixed(4) + "," + latitudeDegrees.toFixed(4);
                     }
                 }
                 
@@ -108,7 +108,7 @@ function toggle3D(is3DEnabled) {
                             if (popupContentElement) {
                                 const lonString = markerLonlat[0].toFixed(6);
                                 const latString = markerLonlat[1].toFixed(6);
-                                popupContentElement.innerHTML = "?????<br>??????: " + lonString + "<br>?????: " + latString;
+                                popupContentElement.innerHTML = "위치<br>위치?: " + lonString + "<br>위치: " + latString;
                             }
                             if (popupElement) {
                                 const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
@@ -291,7 +291,7 @@ function toggle3D(is3DEnabled) {
                                         if (popupContentElement) {
                                             const lonString = markerLonlat[0].toFixed(6);
                                             const latString = markerLonlat[1].toFixed(6);
-                                            popupContentElement.innerHTML = "?????<br>??????: " + lonString + "<br>?????: " + latString;
+                                            popupContentElement.innerHTML = "위치<br>위치?: " + lonString + "<br>위치: " + latString;
                                         }
                                         if (popupElement) {
                                             const screenPosition = Cesium.SceneTransforms.wgs84ToWindowCoordinates(cesiumViewer.scene, markerPosition);
@@ -529,6 +529,10 @@ function toggle3D(is3DEnabled) {
     }
     
     if (!is3DEnabled) {
+        if (typeof teardownCesiumEvents === 'function') {
+            teardownCesiumEvents();
+        }
+        
         let targetLonlat = [127.0276, 37.4979];
         let targetZoom = 13;
         

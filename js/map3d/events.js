@@ -36,7 +36,7 @@ function setupCesiumEvents() {
         return;
     }
     
-    cesiumCameraListener = cesiumViewer.camera.changed.addEventListener(function() {
+    const cameraChangedHandler = function() {
         const cameraHeight = cesiumViewer.camera.positionCartographic.height;
         const cameraPosition = cesiumViewer.camera.positionCartographic;
         
@@ -46,7 +46,9 @@ function setupCesiumEvents() {
                 position: cameraPosition
             });
         }
-    });
+    };
+    
+    cesiumCameraListener = cesiumViewer.camera.changed.addEventListener(cameraChangedHandler);
     
     if (cesiumEventHandler === null) {
         cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
@@ -256,4 +258,18 @@ function setupCesiumEvents() {
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     
     cesiumEventsInitialized = true;
+}
+
+function teardownCesiumEvents() {
+    if (cesiumViewer && cesiumCameraListener) {
+        cesiumViewer.camera.changed.removeEventListener(cesiumCameraListener);
+        cesiumCameraListener = null;
+    }
+    
+    if (cesiumEventHandler) {
+        cesiumEventHandler.destroy();
+        cesiumEventHandler = null;
+    }
+    
+    cesiumEventsInitialized = false;
 }
