@@ -80,6 +80,9 @@ function initializeCesiumViewer(targetLonlat, targetHeight) {
         if (typeof setupCesiumEvents === 'function') {
             setupCesiumEvents();
         }
+        if (typeof setupCesiumUIHandlers === 'function') {
+            setupCesiumUIHandlers();
+        }
     }
 }
 

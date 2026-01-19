@@ -50,3 +50,30 @@ if (typeof initApp === 'function') {
         initApp();
     }, 100);
 }
+
+function setupCesiumEventCoordination() {
+    if (typeof setCesiumEventCallbacks !== 'function') {
+        return;
+    }
+    
+    setCesiumEventCallbacks({
+        onCameraChanged: function(data) {
+            if (typeof sync3DTo2D === 'function' && is3DModeActive) {
+                sync3DTo2D(data.height, data.position);
+            }
+        },
+        
+        onMouseMove: function(eventData) {
+            if (isMeasuringNow || isAreaMeasuringNow) {
+                return { shouldProcessEntity: false };
+            }
+            return { shouldProcessEntity: true };
+        }
+    });
+}
+
+if (typeof setupCesiumEventCoordination === 'function') {
+    setTimeout(function() {
+        setupCesiumEventCoordination();
+    }, 200);
+}

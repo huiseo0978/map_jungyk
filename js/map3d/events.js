@@ -4,6 +4,9 @@ let cesiumEventCallbacks = {
     onDoubleClick: null
 };
 
+let cesiumEventsInitialized = false;
+let cesiumCameraListener = null;
+
 function setCesiumEventCallbacks(callbacks) {
     if (callbacks.onCameraChanged) {
         cesiumEventCallbacks.onCameraChanged = callbacks.onCameraChanged;
@@ -16,12 +19,24 @@ function setCesiumEventCallbacks(callbacks) {
     }
 }
 
+function getCesiumEventCallbacks() {
+    return {
+        onCameraChanged: cesiumEventCallbacks.onCameraChanged,
+        onMouseMove: cesiumEventCallbacks.onMouseMove,
+        onDoubleClick: cesiumEventCallbacks.onDoubleClick
+    };
+}
+
 function setupCesiumEvents() {
     if (!cesiumViewer) {
         return;
     }
     
-    cesiumViewer.camera.changed.addEventListener(function() {
+    if (cesiumEventsInitialized) {
+        return;
+    }
+    
+    cesiumCameraListener = cesiumViewer.camera.changed.addEventListener(function() {
         const cameraHeight = cesiumViewer.camera.positionCartographic.height;
         const cameraPosition = cesiumViewer.camera.positionCartographic;
         
@@ -30,10 +45,6 @@ function setupCesiumEvents() {
                 height: cameraHeight,
                 position: cameraPosition
             });
-        }
-        
-        if (typeof sync3DTo2D === 'function') {
-            sync3DTo2D(cameraHeight, cameraPosition);
         }
     });
     
@@ -53,7 +64,15 @@ function setupCesiumEvents() {
             };
         }
         
-        if (isMeasuringNow === false) {
+        let shouldProcessEntity = true;
+        if (cesiumEventCallbacks.onMouseMove) {
+            const callbackResult = cesiumEventCallbacks.onMouseMove({ coordinate: coordinateData });
+            if (callbackResult && callbackResult.shouldProcessEntity === false) {
+                shouldProcessEntity = false;
+            }
+        }
+        
+        if (shouldProcessEntity) {
             const pickedObject = cesiumViewer.scene.pick(movementEvent.endPosition);
             let eventData = {
                 coordinate: coordinateData,
@@ -235,4 +254,6 @@ function setupCesiumEvents() {
             cesiumEventCallbacks.onDoubleClick();
         }
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    
+    cesiumEventsInitialized = true;
 }
