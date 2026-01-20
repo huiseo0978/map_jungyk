@@ -4,7 +4,9 @@ const openStreetMapLayer = new ol.layer.Tile({
 
 const mainView = new ol.View({
     center: ol.proj.fromLonLat(mapCenter),
-    zoom: 12
+    zoom: 12,
+    minZoom: 0,
+    maxZoom: 20
 });
 
 const citySource = new ol.source.Vector();

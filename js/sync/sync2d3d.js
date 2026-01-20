@@ -1,7 +1,25 @@
+let sync3DTo2DIsSyncing = false;
+
+function getCesiumFOV() {
+    if (typeof cesiumViewer !== 'undefined' && cesiumViewer && cesiumViewer.camera && cesiumViewer.camera.frustum) {
+        const frustum = cesiumViewer.camera.frustum;
+        if (frustum.fovy !== undefined && frustum.fovy !== null && !isNaN(frustum.fovy)) {
+            return frustum.fovy;
+        }
+        if (frustum.fov !== undefined && frustum.fov !== null && !isNaN(frustum.fov)) {
+            return frustum.fov;
+        }
+    }
+    return Math.PI / 3;
+}
+
 function zoomToHeight(zoomLevel, lonlat, mapSize) {
+    if (typeof zoomLevel === 'undefined' || zoomLevel === null) {
+        return 15000;
+    }
     const latitudeRadians = lonlat[1] * Math.PI / 180;
     const metersPerPixelAtEquator = 156543.03392;
-    const cesiumFOV = Math.PI / 3;
+    const cesiumFOV = getCesiumFOV();
     const tanHalfFOV = Math.tan(cesiumFOV / 2);
     
     let viewportHeight = 512;
@@ -22,9 +40,9 @@ function zoomToHeight(zoomLevel, lonlat, mapSize) {
     }
 }
 
-function heightToZoom(cameraHeight, latitudeRadians, mapSize) {
+function heightToZoom(cameraHeight, latitudeRadians, mapSize, mainView) {
     const metersPerPixelAtEquator = 156543.03392;
-    const cesiumFOV = Math.PI / 3;
+    const cesiumFOV = getCesiumFOV();
     const tanHalfFOV = Math.tan(cesiumFOV / 2);
     
     let viewportHeight = 512;
@@ -37,18 +55,31 @@ function heightToZoom(cameraHeight, latitudeRadians, mapSize) {
     const metersPerPixelAtZoom0 = metersPerPixelAtEquator * Math.cos(latitudeRadians);
     let targetZoom = Math.log2(metersPerPixelAtZoom0 / metersPerPixelAtCurrentHeight);
     
-    if (targetZoom < 0) {
-        targetZoom = 0;
+    let minZoom = 0;
+    let maxZoom = 20;
+    if (mainView) {
+        const viewMinZoom = mainView.getMinZoom();
+        const viewMaxZoom = mainView.getMaxZoom();
+        if (viewMinZoom !== undefined && viewMinZoom !== null) {
+            minZoom = viewMinZoom;
+        }
+        if (viewMaxZoom !== undefined && viewMaxZoom !== null) {
+            maxZoom = viewMaxZoom;
+        }
     }
-    if (targetZoom > 20) {
-        targetZoom = 20;
+    
+    if (targetZoom < minZoom) {
+        targetZoom = minZoom;
+    }
+    if (targetZoom > maxZoom) {
+        targetZoom = maxZoom;
     }
     
     return targetZoom;
 }
 
-function sync3DTo2D(cameraHeight, cameraPosition) {
-    if (isSyncingZoom) {
+function sync3DTo2D({ cameraHeight, cameraPosition, map, mainView, is3DModeActive }) {
+    if (sync3DTo2DIsSyncing) {
         return;
     }
     if (!is3DModeActive || typeof map === 'undefined' || !map || typeof mainView === 'undefined' || !mainView) {
@@ -59,13 +90,13 @@ function sync3DTo2D(cameraHeight, cameraPosition) {
     const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
     const latitudeRadians = cameraPosition.latitude;
     const mapSize = map.getSize();
-    const targetZoom = heightToZoom(cameraHeight, latitudeRadians, mapSize);
+    const targetZoom = heightToZoom(cameraHeight, latitudeRadians, mapSize, mainView);
     
     const currentZoom = mainView.getZoom();
     const zoomDifference = Math.abs(targetZoom - currentZoom);
     
     if (zoomDifference > 0.01) {
-        isSyncingZoom = true;
+        sync3DTo2DIsSyncing = true;
         const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
         mainView.animate({
             center: coordinate,
@@ -73,7 +104,8 @@ function sync3DTo2D(cameraHeight, cameraPosition) {
             duration: 300
         });
         setTimeout(function() {
-            isSyncingZoom = false;
+            sync3DTo2DIsSyncing = false;
         }, 400);
     }
 }
+    

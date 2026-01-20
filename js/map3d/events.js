@@ -48,7 +48,8 @@ function setupCesiumEvents() {
         }
     };
     
-    cesiumCameraListener = cesiumViewer.camera.changed.addEventListener(cameraChangedHandler);
+    cesiumCameraListener = cameraChangedHandler;
+    cesiumViewer.camera.changed.addEventListener(cameraChangedHandler);
     
     if (cesiumEventHandler === null) {
         cesiumEventHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
@@ -267,6 +268,8 @@ function teardownCesiumEvents() {
     }
     
     if (cesiumEventHandler) {
+        cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+        cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
         cesiumEventHandler.destroy();
         cesiumEventHandler = null;
     }

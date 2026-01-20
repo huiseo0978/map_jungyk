@@ -59,7 +59,13 @@ function setupCesiumEventCoordination() {
     setCesiumEventCallbacks({
         onCameraChanged: function(data) {
             if (typeof sync3DTo2D === 'function' && is3DModeActive) {
-                sync3DTo2D(data.height, data.position);
+                sync3DTo2D({
+                    cameraHeight: data.height,
+                    cameraPosition: data.position,
+                    map: map,
+                    mainView: mainView,
+                    is3DModeActive: is3DModeActive
+                });
             }
         },
         
