@@ -1,8 +1,4 @@
-let globalErrorListenerAdded = false;
-let globalUnhandledRejectionListenerAdded = false;
-let globalResizeListenerAdded = false;
-
-if (!globalErrorListenerAdded) {
+if (!window.__globalErrorListenerAdded) {
     window.addEventListener("error", function(event) {
         if (event.message) {
             if (event.message.indexOf("CORS") !== -1) {
@@ -17,10 +13,10 @@ if (!globalErrorListenerAdded) {
             }
         }
     }, false);
-    globalErrorListenerAdded = true;
+    window.__globalErrorListenerAdded = true;
 }
 
-if (!globalUnhandledRejectionListenerAdded) {
+if (!window.__globalUnhandledRejectionListenerAdded) {
     window.addEventListener("unhandledrejection", function(event) {
         if (event.reason) {
             if (event.reason.message) {
@@ -39,7 +35,7 @@ if (!globalUnhandledRejectionListenerAdded) {
             }
         }
     }, false);
-    globalUnhandledRejectionListenerAdded = true;
+    window.__globalUnhandledRejectionListenerAdded = true;
 }
 
 function initApp() {
@@ -51,11 +47,11 @@ function initApp() {
     }
 }
 
-if (!globalResizeListenerAdded) {
+if (!window.__globalResizeListenerAdded) {
     window.addEventListener('resize', function() {
         initApp();
     });
-    globalResizeListenerAdded = true;
+    window.__globalResizeListenerAdded = true;
 }
 
 if (typeof initApp === 'function') {
@@ -68,10 +64,8 @@ if (typeof initApp === 'function') {
     }
 }
 
-let cesiumEventCoordinationSetup = false;
-
 function setupCesiumEventCoordination() {
-    if (cesiumEventCoordinationSetup) {
+    if (window.__cesiumEventCoordinationSetup) {
         return;
     }
     
@@ -100,24 +94,29 @@ function setupCesiumEventCoordination() {
         }
     });
     
-    cesiumEventCoordinationSetup = true;
+    window.__cesiumEventCoordinationSetup = true;
 }
 
-let cesiumEventCoordinationRetryCount = 0;
+if (!window.__cesiumEventCoordinationRetryCount) {
+    window.__cesiumEventCoordinationRetryCount = 0;
+}
 const MAX_CESIUM_EVENT_COORDINATION_RETRIES = 50;
 
 function trySetupCesiumEventCoordination() {
-    if (cesiumEventCoordinationSetup) {
+    if (window.__cesiumEventCoordinationSetup) {
         return;
     }
     
     if (typeof setCesiumEventCallbacks === 'function' && typeof sync3DTo2D === 'function' && typeof map !== 'undefined' && typeof mainView !== 'undefined') {
         setupCesiumEventCoordination();
     } else {
-        cesiumEventCoordinationRetryCount++;
-        if (cesiumEventCoordinationRetryCount < MAX_CESIUM_EVENT_COORDINATION_RETRIES) {
+        window.__cesiumEventCoordinationRetryCount++;
+        if (window.__cesiumEventCoordinationRetryCount < MAX_CESIUM_EVENT_COORDINATION_RETRIES) {
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', trySetupCesiumEventCoordination);
+                if (!window.__cesiumEventCoordinationDOMListenerAdded) {
+                    document.addEventListener('DOMContentLoaded', trySetupCesiumEventCoordination);
+                    window.__cesiumEventCoordinationDOMListenerAdded = true;
+                }
             } else {
                 if (typeof requestAnimationFrame !== 'undefined') {
                     requestAnimationFrame(trySetupCesiumEventCoordination);
