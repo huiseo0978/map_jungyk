@@ -1,36 +1,46 @@
-window.addEventListener("error", function(event) {
-    if (event.message) {
-        if (event.message.indexOf("CORS") !== -1) {
-            event.preventDefault();
-            return false;
-        }
-    }
-    if (event.message) {
-        if (event.message.indexOf("Failed to obtain image tile") !== -1) {
-            event.preventDefault();
-            return false;
-        }
-    }
-}, false);
+let globalErrorListenerAdded = false;
+let globalUnhandledRejectionListenerAdded = false;
+let globalResizeListenerAdded = false;
 
-window.addEventListener("unhandledrejection", function(event) {
-    if (event.reason) {
-        if (event.reason.message) {
-            if (event.reason.message.indexOf("CORS") !== -1) {
+if (!globalErrorListenerAdded) {
+    window.addEventListener("error", function(event) {
+        if (event.message) {
+            if (event.message.indexOf("CORS") !== -1) {
                 event.preventDefault();
                 return false;
             }
         }
-    }
-    if (event.reason) {
-        if (event.reason.message) {
-            if (event.reason.message.indexOf("Failed to obtain image tile") !== -1) {
+        if (event.message) {
+            if (event.message.indexOf("Failed to obtain image tile") !== -1) {
                 event.preventDefault();
                 return false;
             }
         }
-    }
-}, false);
+    }, false);
+    globalErrorListenerAdded = true;
+}
+
+if (!globalUnhandledRejectionListenerAdded) {
+    window.addEventListener("unhandledrejection", function(event) {
+        if (event.reason) {
+            if (event.reason.message) {
+                if (event.reason.message.indexOf("CORS") !== -1) {
+                    event.preventDefault();
+                    return false;
+                }
+            }
+        }
+        if (event.reason) {
+            if (event.reason.message) {
+                if (event.reason.message.indexOf("Failed to obtain image tile") !== -1) {
+                    event.preventDefault();
+                    return false;
+                }
+            }
+        }
+    }, false);
+    globalUnhandledRejectionListenerAdded = true;
+}
 
 function initApp() {
     if (typeof map !== 'undefined' && map && typeof map.updateSize === 'function') {
@@ -41,17 +51,30 @@ function initApp() {
     }
 }
 
-window.addEventListener('resize', function() {
-    initApp();
-});
-
-if (typeof initApp === 'function') {
-    setTimeout(function() {
+if (!globalResizeListenerAdded) {
+    window.addEventListener('resize', function() {
         initApp();
-    }, 100);
+    });
+    globalResizeListenerAdded = true;
 }
 
+if (typeof initApp === 'function') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+        });
+    } else {
+        initApp();
+    }
+}
+
+let cesiumEventCoordinationSetup = false;
+
 function setupCesiumEventCoordination() {
+    if (cesiumEventCoordinationSetup) {
+        return;
+    }
+    
     if (typeof setCesiumEventCallbacks !== 'function') {
         return;
     }
@@ -76,10 +99,34 @@ function setupCesiumEventCoordination() {
             return { shouldProcessEntity: true };
         }
     });
+    
+    cesiumEventCoordinationSetup = true;
+}
+
+let cesiumEventCoordinationRetryCount = 0;
+const MAX_CESIUM_EVENT_COORDINATION_RETRIES = 50;
+
+function trySetupCesiumEventCoordination() {
+    if (cesiumEventCoordinationSetup) {
+        return;
+    }
+    
+    if (typeof setCesiumEventCallbacks === 'function' && typeof sync3DTo2D === 'function' && typeof map !== 'undefined' && typeof mainView !== 'undefined') {
+        setupCesiumEventCoordination();
+    } else {
+        cesiumEventCoordinationRetryCount++;
+        if (cesiumEventCoordinationRetryCount < MAX_CESIUM_EVENT_COORDINATION_RETRIES) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', trySetupCesiumEventCoordination);
+            } else {
+                if (typeof requestAnimationFrame !== 'undefined') {
+                    requestAnimationFrame(trySetupCesiumEventCoordination);
+                }
+            }
+        }
+    }
 }
 
 if (typeof setupCesiumEventCoordination === 'function') {
-    setTimeout(function() {
-        setupCesiumEventCoordination();
-    }, 200);
+    trySetupCesiumEventCoordination();
 }
