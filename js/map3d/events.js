@@ -1,3 +1,5 @@
+const CLOSEST_DISTANCE_THRESHOLD = 0.01;
+
 let cesiumEventCallbacks = {
     onCameraChanged: null,
     onMouseMove: null,
