@@ -161,7 +161,7 @@ function handleAreaClickFunction(event) {
         return;
     }
     
-    const clickedCoordinate = event.coordinate;
+    const clickedCoordinate = map.getCoordinateFromPixel(event.pixel);
     areaPointsArray.push(clickedCoordinate);
     
     const clickedPointFeature = new ol.Feature({
@@ -212,7 +212,21 @@ function handleAreaClick3DFunction(clickEvent) {
         return;
     }
     
-    const pickedCartesian = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
+    let pickedCartesian = null;
+    
+    const ray = cesiumViewer.camera.getPickRay(clickEvent.position);
+    if (ray) {
+        pickedCartesian = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
+    }
+    
+    if (!pickedCartesian) {
+        pickedCartesian = cesiumViewer.scene.pickPosition(clickEvent.position);
+    }
+    
+    if (!pickedCartesian) {
+        pickedCartesian = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
+    }
+    
     if (!pickedCartesian) {
         return;
     }

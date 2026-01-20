@@ -1,6 +1,6 @@
 function moveMap2D(lonlat, zoomLevel) {
     if (zoomLevel === undefined) {
-        zoomLevel = 13;
+        zoomLevel = DEFAULT_ZOOM_LEVEL;
     }
     const coordinate = ol.proj.fromLonLat(lonlat);
     mainView.animate({ center: coordinate, zoom: zoomLevel, duration: 700 });
@@ -44,7 +44,7 @@ function setMarker(lonlat) {
 window.goCity = function(cityName) {
     const cityInfo = cityInfos[cityName];
     if (cityInfo) {
-        moveMap(cityInfo.lonlat, 13);
+        moveMap(cityInfo.lonlat, DEFAULT_ZOOM_LEVEL);
         setMarker(cityInfo.lonlat);
         if (is3DModeActive) {
             if (cesiumActiveMarker) {
@@ -62,7 +62,7 @@ window.goCityZoom = function(cityName) {
     const cityInfo = cityInfos[cityName];
     if (cityInfo) {
         const cityCoordinate = cityInfo.lonlat;
-        moveMap(cityCoordinate, 16);
+        moveMap(cityCoordinate, CITY_ZOOM_LEVEL);
         setMarker(cityCoordinate);
         if (is3DModeActive) {
             if (cesiumActiveMarker) {

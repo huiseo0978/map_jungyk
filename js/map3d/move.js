@@ -27,7 +27,7 @@ function moveCesiumCamera(targetLonlat, targetHeight) {
 
 function moveMap3D(lonlat, zoomLevel) {
     if (cesiumViewer) {
-        let targetHeight = 15000;
+        let targetHeight = DEFAULT_CAMERA_HEIGHT;
         if (zoomLevel !== undefined) {
             let mapSize = null;
             if (typeof map !== 'undefined' && map) {

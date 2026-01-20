@@ -314,7 +314,7 @@ function handleMeasureClickFunction(event) {
         return;
     }
     
-    const clickedCoordinate = event.coordinate;
+    const clickedCoordinate = map.getCoordinateFromPixel(event.pixel);
     measurePointsArray.push(clickedCoordinate);
     
     const clickedPointFeature = new ol.Feature({
@@ -562,8 +562,22 @@ function handleMeasureClick3DFunction(clickEvent) {
         return;
     }
     
-    const pickedPosition = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
-    if (pickedPosition === undefined) {
+    let pickedPosition = null;
+    
+    const ray = cesiumViewer.camera.getPickRay(clickEvent.position);
+    if (ray) {
+        pickedPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
+    }
+    
+    if (!pickedPosition) {
+        pickedPosition = cesiumViewer.scene.pickPosition(clickEvent.position);
+    }
+    
+    if (!pickedPosition) {
+        pickedPosition = cesiumViewer.camera.pickEllipsoid(clickEvent.position, cesiumViewer.scene.globe.ellipsoid);
+    }
+    
+    if (!pickedPosition) {
         return;
     }
     

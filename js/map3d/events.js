@@ -160,7 +160,7 @@ function setupCesiumEvents() {
                     const mouseLon = Cesium.Math.toDegrees(cartographicPosition.longitude);
                     const mouseLat = Cesium.Math.toDegrees(cartographicPosition.latitude);
                     let closestCityEntity = null;
-                    let closestDistance = 0.01;
+                    let closestDistance = CLOSEST_DISTANCE_THRESHOLD;
                     
                     for (let cityIndex = 0; cityIndex < cesiumCityEntitiesArray.length; cityIndex = cityIndex + 1) {
                         const currentCityEntity = cesiumCityEntitiesArray[cityIndex];
@@ -212,7 +212,7 @@ function setupCesiumEvents() {
                         const distanceLat = Math.abs(mouseLat - markerLat);
                         const totalDistance = Math.sqrt(distanceLon * distanceLon + distanceLat * distanceLat);
                         
-                        if (totalDistance < 0.01) {
+                        if (totalDistance < CLOSEST_DISTANCE_THRESHOLD) {
                             eventData.foundActiveMarker = true;
                             let markerLonlat = [markerLon, markerLat];
                             if (cesiumActiveMarker.properties && cesiumActiveMarker.properties.lonlat) {
