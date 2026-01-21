@@ -76,7 +76,14 @@ function heightToZoom(cameraHeight, latitudeRadians, mapSize, mainView) {
     return targetZoom;
 }
 
-function sync3DTo2D({ cameraHeight, cameraPosition, map, mainView, is3DModeActive }) {
+function sync3DTo2D(params) {
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+        console.error('sync3DTo2D must be called with an object parameter');
+        return;
+    }
+    
+    const { cameraHeight, cameraPosition, map, mainView, is3DModeActive } = params;
+    
     if (sync3DTo2DIsSyncing) {
         return;
     }
