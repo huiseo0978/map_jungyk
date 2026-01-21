@@ -1,3 +1,4 @@
+(function() {
 let sync3DTo2DIsSyncing = false;
 
 function getCesiumFOV() {
@@ -113,3 +114,6 @@ function sync3DTo2D(params) {
         }, SYNC_DELAY);
     }
 }
+
+window.sync3DTo2D = sync3DTo2D;
+})();
