@@ -1,13 +1,12 @@
-(function() {
-let sync3DTo2DIsSyncing = false;
+var sync3DTo2DIsSyncing = false;
 
 function getCesiumFOV() {
-    if (typeof cesiumViewer !== 'undefined' && cesiumViewer && cesiumViewer.camera && cesiumViewer.camera.frustum) {
-        const frustum = cesiumViewer.camera.frustum;
-        if (frustum.fovy !== undefined && frustum.fovy !== null && !isNaN(frustum.fovy)) {
+    if (cesiumViewer && cesiumViewer.camera && cesiumViewer.camera.frustum) {
+        var frustum = cesiumViewer.camera.frustum;
+        if (frustum.fovy) {
             return frustum.fovy;
         }
-        if (frustum.fov !== undefined && frustum.fov !== null && !isNaN(frustum.fov)) {
+        if (frustum.fov) {
             return frustum.fov;
         }
     }
@@ -15,97 +14,100 @@ function getCesiumFOV() {
 }
 
 function zoomToHeight(zoomLevel, lonlat, mapSize) {
-    if (typeof zoomLevel === 'undefined' || zoomLevel === null) {
+    if (!zoomLevel) {
         return DEFAULT_CAMERA_HEIGHT;
     }
-    const latitudeRadians = lonlat[1] * Math.PI / 180;
-    const cesiumFOV = getCesiumFOV();
-    const tanHalfFOV = Math.tan(cesiumFOV / 2);
+    var lat = lonlat[1] * Math.PI / 180;
+    var fov = getCesiumFOV();
+    var tanFOV = Math.tan(fov / 2);
     
-    let viewportHeight = DEFAULT_VIEWPORT_HEIGHT;
+    var vh = DEFAULT_VIEWPORT_HEIGHT;
     if (mapSize && mapSize[1] > 0) {
-        viewportHeight = mapSize[1];
+        vh = mapSize[1];
     }
     
-    const metersPerPixel = METERS_PER_PIXEL_AT_EQUATOR * Math.cos(latitudeRadians) / Math.pow(2, zoomLevel);
-    const viewportHeightInMeters = metersPerPixel * viewportHeight;
-    const calculatedHeight = viewportHeightInMeters / (2 * tanHalfFOV);
+    var mpp = METERS_PER_PIXEL_AT_EQUATOR * Math.cos(lat) / Math.pow(2, zoomLevel);
+    var vhMeters = mpp * vh;
+    var height = vhMeters / (2 * tanFOV);
     
-    if (calculatedHeight < MIN_CAMERA_HEIGHT) {
+    if (height < MIN_CAMERA_HEIGHT) {
         return MIN_CAMERA_HEIGHT;
-    } else if (calculatedHeight > MAX_CAMERA_HEIGHT) {
-        return MAX_CAMERA_HEIGHT;
-    } else {
-        return calculatedHeight;
     }
+    if (height > MAX_CAMERA_HEIGHT) {
+        return MAX_CAMERA_HEIGHT;
+    }
+    return height;
 }
 
-function heightToZoom(cameraHeight, latitudeRadians, mapSize, mainView) {
-    const cesiumFOV = getCesiumFOV();
-    const tanHalfFOV = Math.tan(cesiumFOV / 2);
+function heightToZoom(cameraHeight, latRad, mapSize, mainView) {
+    var fov = getCesiumFOV();
+    var tanFOV = Math.tan(fov / 2);
     
-    let viewportHeight = DEFAULT_VIEWPORT_HEIGHT;
+    var vh = DEFAULT_VIEWPORT_HEIGHT;
     if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
-        viewportHeight = mapSize[1];
+        vh = mapSize[1];
     }
     
-    const viewportHeightInMeters = cameraHeight * 2 * tanHalfFOV;
-    const metersPerPixelAtCurrentHeight = viewportHeightInMeters / viewportHeight;
-    const metersPerPixelAtZoom0 = METERS_PER_PIXEL_AT_EQUATOR * Math.cos(latitudeRadians);
-    let targetZoom = Math.log2(metersPerPixelAtZoom0 / metersPerPixelAtCurrentHeight);
+    var vhMeters = cameraHeight * 2 * tanFOV;
+    var mpp = vhMeters / vh;
+    var mpp0 = METERS_PER_PIXEL_AT_EQUATOR * Math.cos(latRad);
+    var zoom = Math.log2(mpp0 / mpp);
     
-    let minZoom = 0;
-    let maxZoom = 20;
+    var minZ = 0;
+    var maxZ = 20;
     if (mainView) {
-        const viewMinZoom = mainView.getMinZoom();
-        const viewMaxZoom = mainView.getMaxZoom();
-        if (viewMinZoom !== undefined && viewMinZoom !== null) {
-            minZoom = viewMinZoom;
+        var vMin = mainView.getMinZoom();
+        var vMax = mainView.getMaxZoom();
+        if (vMin != null) {
+            minZ = vMin;
         }
-        if (viewMaxZoom !== undefined && viewMaxZoom !== null) {
-            maxZoom = viewMaxZoom;
+        if (vMax != null) {
+            maxZ = vMax;
         }
     }
     
-    if (targetZoom < minZoom) {
-        targetZoom = minZoom;
+    if (zoom < minZ) {
+        zoom = minZ;
     }
-    if (targetZoom > maxZoom) {
-        targetZoom = maxZoom;
+    if (zoom > maxZ) {
+        zoom = maxZ;
     }
     
-    return targetZoom;
+    return zoom;
 }
 
 function sync3DTo2D(params) {
-    if (!params || typeof params !== 'object' || Array.isArray(params)) {
-        console.error('sync3DTo2D must be called with an object parameter');
+    if (!params || typeof params != 'object') {
         return;
     }
     
-    const { cameraHeight, cameraPosition, map, mainView, is3DModeActive } = params;
+    var height = params.cameraHeight;
+    var pos = params.cameraPosition;
+    var map = params.map;
+    var view = params.mainView;
+    var is3D = params.is3DModeActive;
     
     if (sync3DTo2DIsSyncing) {
         return;
     }
-    if (!is3DModeActive || typeof map === 'undefined' || !map || typeof mainView === 'undefined' || !mainView) {
+    if (!is3D || !map || !view) {
         return;
     }
     
-    const cameraLon = Cesium.Math.toDegrees(cameraPosition.longitude);
-    const cameraLat = Cesium.Math.toDegrees(cameraPosition.latitude);
-    const latitudeRadians = cameraPosition.latitude;
-    const mapSize = map.getSize();
-    const targetZoom = heightToZoom(cameraHeight, latitudeRadians, mapSize, mainView);
+    var lon = Cesium.Math.toDegrees(pos.longitude);
+    var lat = Cesium.Math.toDegrees(pos.latitude);
+    var latRad = pos.latitude;
+    var size = map.getSize();
+    var targetZoom = heightToZoom(height, latRad, size, view);
     
-    const currentZoom = mainView.getZoom();
-    const zoomDifference = Math.abs(targetZoom - currentZoom);
+    var currentZoom = view.getZoom();
+    var diff = Math.abs(targetZoom - currentZoom);
     
-    if (zoomDifference > ZOOM_DIFFERENCE_THRESHOLD) {
+    if (diff > ZOOM_DIFFERENCE_THRESHOLD) {
         sync3DTo2DIsSyncing = true;
-        const coordinate = ol.proj.fromLonLat([cameraLon, cameraLat]);
-        mainView.animate({
-            center: coordinate,
+        var coord = ol.proj.fromLonLat([lon, lat]);
+        view.animate({
+            center: coord,
             zoom: targetZoom,
             duration: ANIMATION_DURATION
         });
@@ -114,6 +116,3 @@ function sync3DTo2D(params) {
         }, SYNC_DELAY);
     }
 }
-
-window.sync3DTo2D = sync3DTo2D;
-})();

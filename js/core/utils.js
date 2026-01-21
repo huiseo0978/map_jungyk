@@ -1,42 +1,48 @@
-function svgToDataUri(svgText) {
-    return "data:image/svg+xml;utf8," + encodeURIComponent(svgText);
+function svgToDataUri(svg) {
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
 }
 
-function formatCoordinate(lon, lat, precision = 4) {
-    return lon.toFixed(precision) + "," + lat.toFixed(precision);
+function formatCoordinate(lon, lat) {
+    var p = 4;
+    if (arguments.length > 2) {
+        p = arguments[2];
+    }
+    return lon.toFixed(p) + "," + lat.toFixed(p);
 }
 
 function getElementById(id) {
     return document.getElementById(id);
 }
 
-function querySelector(selector, parent = document) {
-    return parent.querySelector(selector);
+function querySelector(sel, parent) {
+    if (!parent) {
+        parent = document;
+    }
+    return parent.querySelector(sel);
 }
 
-function querySelectorAll(selector, parent = document) {
-    return parent.querySelectorAll(selector);
+function querySelectorAll(sel, parent) {
+    if (!parent) {
+        parent = document;
+    }
+    return parent.querySelectorAll(sel);
 }
 
-function blinkMarker(featureToBlink, styleToApply) {
+function blinkMarker(feature, style) {
     if (is3DModeActive) {
         if (cesiumActiveMarker) {
             if (markerBlinker) {
                 clearInterval(markerBlinker);
             }
-            let blinkCount = 0;
-            let isVisible = true;
+            var count = 0;
+            var visible = true;
             markerBlinker = setInterval(function() {
-                if (isVisible) {
-                    isVisible = false;
-                } else {
-                    isVisible = true;
-                }
+                visible = !visible;
                 if (cesiumActiveMarker && cesiumActiveMarker.billboard) {
-                    cesiumActiveMarker.billboard.show = isVisible;
+                    cesiumActiveMarker.billboard.show = visible;
                 }
-                blinkCount = blinkCount + 1;
-                if (blinkCount >= BLINK_COUNT) {
+                count++;
+                if (count >= BLINK_COUNT) {
                     clearInterval(markerBlinker);
                     markerBlinker = null;
                     if (cesiumActiveMarker && cesiumActiveMarker.billboard) {
@@ -49,24 +55,20 @@ function blinkMarker(featureToBlink, styleToApply) {
         if (markerBlinker) {
             clearInterval(markerBlinker);
         }
-        let blinkCount = 0;
-        let isVisible = true;
+        var count = 0;
+        var visible = true;
         markerBlinker = setInterval(function() {
-            if (isVisible) {
-                isVisible = false;
+            visible = !visible;
+            if (visible) {
+                feature.setStyle(style);
             } else {
-                isVisible = true;
+                feature.setStyle(null);
             }
-            if (isVisible) {
-                featureToBlink.setStyle(styleToApply);
-            } else {
-                featureToBlink.setStyle(null);
-            }
-            blinkCount = blinkCount + 1;
-            if (blinkCount >= BLINK_COUNT) {
+            count++;
+            if (count >= BLINK_COUNT) {
                 clearInterval(markerBlinker);
                 markerBlinker = null;
-                featureToBlink.setStyle(styleToApply);
+                feature.setStyle(style);
             }
         }, BLINK_INTERVAL);
     }
