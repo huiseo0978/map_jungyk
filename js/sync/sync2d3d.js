@@ -14,7 +14,7 @@ function getCesiumFOV() {
 }
 
 function zoomToHeight(zoomLevel, lonlat, mapSize) {
-    if (!zoomLevel) {
+    if (zoomLevel == null) {
         return DEFAULT_CAMERA_HEIGHT;
     }
     var lat = lonlat[1] * Math.PI / 180;
@@ -91,6 +91,9 @@ function sync3DTo2D(params) {
         return;
     }
     if (!is3D || !map || !view) {
+        return;
+    }
+    if (!pos || height == null) {
         return;
     }
     
