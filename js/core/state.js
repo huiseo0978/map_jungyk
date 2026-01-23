@@ -5,7 +5,6 @@ let cesiumViewer = null;
 let cesiumCityEntitiesArray = [];
 let cesiumActiveMarker = null;
 let cesiumEventHandler = null;
-let isSyncingZoom = false;
 let last2DZoomLevel = null;
 let modalZIndex = 1000;
 let isMeasuringNow = false;

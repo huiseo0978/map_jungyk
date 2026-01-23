@@ -1,4 +1,6 @@
+(function() {
 var sync3DTo2DIsSyncing = false;
+var isSyncingZoom = false;
 
 function getCesiumFOV() {
     if (cesiumViewer && cesiumViewer.camera && cesiumViewer.camera.frustum) {
@@ -119,3 +121,44 @@ function sync3DTo2D(params) {
         }, SYNC_DELAY);
     }
 }
+
+function sync2DTo3D(params) {
+    if (!params || typeof params != 'object') {
+        return;
+    }
+    
+    var lonlat = params.lonlat;
+    var targetHeight = params.targetHeight;
+    var cesiumViewer = params.cesiumViewer;
+    var is3D = params.is3DModeActive;
+    
+    if (isSyncingZoom) {
+        return;
+    }
+    if (is3D || !cesiumViewer) {
+        return;
+    }
+    if (!lonlat || targetHeight == null) {
+        return;
+    }
+    
+    isSyncingZoom = true;
+    cesiumViewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lonlat[0], lonlat[1], targetHeight),
+        duration: 0.3
+    });
+    setTimeout(function() {
+        isSyncingZoom = false;
+    }, SYNC_DELAY);
+}
+
+function getIsSyncingZoom() {
+    return isSyncingZoom;
+}
+
+window.sync3DTo2D = sync3DTo2D;
+window.sync2DTo3D = sync2DTo3D;
+window.getIsSyncingZoom = getIsSyncingZoom;
+window.zoomToHeight = zoomToHeight;
+window.heightToZoom = heightToZoom;
+})();

@@ -1,6 +1,5 @@
 function moveCesiumCamera(targetLonlat, targetHeight) {
     if (cesiumViewer && !cesiumViewer.isDestroyed()) {
-        isSyncingZoom = true;
         const destinationCartesian = Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight);
         cesiumViewer.camera.flyTo({
             destination: destinationCartesian,
@@ -18,9 +17,6 @@ function moveCesiumCamera(targetLonlat, targetHeight) {
                     }
                 });
             }
-            setTimeout(function() {
-                isSyncingZoom = false;
-            }, 2000);
         }, 1500);
     }
 }

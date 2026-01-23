@@ -45,7 +45,6 @@ function initializeCesiumViewer(targetLonlat, targetHeight) {
         } catch (e) {
         }
 
-        isSyncingZoom = true;
         const destinationCartesian = Cesium.Cartesian3.fromDegrees(targetLonlat[0], targetLonlat[1], targetHeight);
         cesiumViewer.camera.setView({
             destination: destinationCartesian,
@@ -67,9 +66,6 @@ function initializeCesiumViewer(targetLonlat, targetHeight) {
                     }
                 });
             }
-            setTimeout(function() {
-                isSyncingZoom = false;
-            }, 2000);
         }, 1500);
         
         cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
