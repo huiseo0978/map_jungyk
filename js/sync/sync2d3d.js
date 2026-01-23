@@ -50,10 +50,10 @@ function heightToZoom(cameraHeight, latRad, mapSize, mainView) {
         vh = mapSize[1];
     }
     
-    var vhMeters = cameraHeight * 2 * tanFOV;
-    var mpp = vhMeters / vh;
-    var mpp0 = METERS_PER_PIXEL_AT_EQUATOR * Math.cos(latRad);
-    var zoom = Math.log2(mpp0 / mpp);
+    var cosLat = Math.cos(latRad);
+    var numerator = METERS_PER_PIXEL_AT_EQUATOR * cosLat * vh;
+    var denominator = cameraHeight * 2 * tanFOV;
+    var zoom = Math.log2(numerator / denominator);
     
     var minZ = 0;
     var maxZ = 20;

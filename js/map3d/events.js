@@ -262,15 +262,27 @@ function setupCesiumEvents() {
 }
 
 function teardownCesiumEvents() {
-    if (cesiumViewer && cesiumCameraListener) {
-        cesiumViewer.camera.changed.removeEventListener(cesiumCameraListener);
+    if (cesiumViewer && !cesiumViewer.isDestroyed && !cesiumViewer.isDestroyed()) {
+        if (cesiumCameraListener) {
+            try {
+                if (cesiumViewer.camera && cesiumViewer.camera.changed) {
+                    cesiumViewer.camera.changed.removeEventListener(cesiumCameraListener);
+                }
+            } catch (error) {
+            }
+            cesiumCameraListener = null;
+        }
+    } else {
         cesiumCameraListener = null;
     }
     
     if (cesiumEventHandler) {
-        cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-        cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-        cesiumEventHandler.destroy();
+        try {
+            cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            cesiumEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+            cesiumEventHandler.destroy();
+        } catch (error) {
+        }
         cesiumEventHandler = null;
     }
     

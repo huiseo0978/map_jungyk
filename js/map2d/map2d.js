@@ -196,7 +196,7 @@ map.getView().on('change:resolution', function() {
         last2DZoomLevel = currentZoom;
     }
     
-    if (isSyncingZoom) {
+    if (typeof window.getIsSyncingZoom === 'function' && window.getIsSyncingZoom()) {
         return;
     }
     if (cesiumViewer && !is3DModeActive) {
@@ -211,28 +211,28 @@ map.getView().on('change:resolution', function() {
             const cesiumFOV = Math.PI / 3;
             const tanHalfFOV = Math.tan(cesiumFOV / 2);
             
-            let viewportHeight = 512;
+            let viewportHeight = DEFAULT_VIEWPORT_HEIGHT;
             if (mapSize && mapSize[1] > 0) {
                 viewportHeight = mapSize[1];
             }
             
             const viewportHeightInMeters = metersPerPixel * viewportHeight;
             const targetHeight = viewportHeightInMeters / (2 * tanHalfFOV);
-            const clampedHeight = Math.max(100, Math.min(40000000, targetHeight));
+            const clampedHeight = Math.max(MIN_CAMERA_HEIGHT, Math.min(MAX_CAMERA_HEIGHT, targetHeight));
             
             const currentCameraHeight = cesiumViewer.camera.positionCartographic.height;
             const heightDifference = Math.abs(clampedHeight - currentCameraHeight);
             const heightDifferencePercent = heightDifference / Math.max(currentCameraHeight, 1);
             
-            if (heightDifferencePercent > 0.01) {
-                isSyncingZoom = true;
-                cesiumViewer.camera.flyTo({
-                    destination: Cesium.Cartesian3.fromDegrees(currentLonLat[0], currentLonLat[1], clampedHeight),
-                    duration: 0.3
-                });
-                setTimeout(function() {
-                    isSyncingZoom = false;
-                }, 400);
+            if (heightDifferencePercent > ZOOM_DIFFERENCE_THRESHOLD) {
+                if (typeof sync2DTo3D === 'function') {
+                    sync2DTo3D({
+                        lonlat: currentLonLat,
+                        targetHeight: clampedHeight,
+                        cesiumViewer: cesiumViewer,
+                        is3DModeActive: is3DModeActive
+                    });
+                }
             }
         }
     }
