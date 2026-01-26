@@ -5,10 +5,10 @@ var isSyncingZoom = false;
 function getCesiumFOV() {
     if (cesiumViewer && cesiumViewer.camera && cesiumViewer.camera.frustum) {
         var frustum = cesiumViewer.camera.frustum;
-        if (frustum.fovy) {
+        if (frustum.fovy != null && typeof frustum.fovy === 'number' && frustum.fovy > 0) {
             return frustum.fovy;
         }
-        if (frustum.fov) {
+        if (frustum.fov != null && typeof frustum.fov === 'number' && frustum.fov > 0) {
             return frustum.fov;
         }
     }
@@ -42,18 +42,56 @@ function zoomToHeight(zoomLevel, lonlat, mapSize) {
 }
 
 function heightToZoom(cameraHeight, latRad, mapSize, mainView) {
+    if (cameraHeight == null || !isFinite(cameraHeight) || cameraHeight <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
+    if (latRad == null || !isFinite(latRad)) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
     var fov = getCesiumFOV();
+    if (!isFinite(fov) || fov <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
     var tanFOV = Math.tan(fov / 2);
+    if (!isFinite(tanFOV) || tanFOV <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
     
     var vh = DEFAULT_VIEWPORT_HEIGHT;
     if (mapSize && mapSize[0] > 0 && mapSize[1] > 0) {
         vh = mapSize[1];
     }
+    if (!isFinite(vh) || vh <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
     
     var cosLat = Math.cos(latRad);
+    if (!isFinite(cosLat) || cosLat <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
     var numerator = METERS_PER_PIXEL_AT_EQUATOR * cosLat * vh;
+    if (!isFinite(numerator) || numerator <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
     var denominator = cameraHeight * 2 * tanFOV;
-    var zoom = Math.log2(numerator / denominator);
+    if (!isFinite(denominator) || denominator <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
+    var ratio = numerator / denominator;
+    if (!isFinite(ratio) || ratio <= 0) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
+    
+    var zoom = Math.log2(ratio);
+    if (!isFinite(zoom)) {
+        return DEFAULT_ZOOM_LEVEL;
+    }
     
     var minZ = 0;
     var maxZ = 20;
@@ -108,13 +146,24 @@ function sync3DTo2D(params) {
     var targetZoom = heightToZoom(height, latRad, size, view);
     
     var currentZoom = view.getZoom();
-    var diff = Math.abs(targetZoom - currentZoom);
+    var zoomDiff = Math.abs(targetZoom - currentZoom);
     
-    if (diff > ZOOM_DIFFERENCE_THRESHOLD) {
+    var currentCenter = view.getCenter();
+    var targetCoord = ol.proj.fromLonLat([lon, lat]);
+    var centerDiff = 0;
+    if (currentCenter) {
+        var currentLonLat = ol.proj.toLonLat(currentCenter);
+        var lonDiff = Math.abs(currentLonLat[0] - lon);
+        var latDiff = Math.abs(currentLonLat[1] - lat);
+        centerDiff = Math.sqrt(lonDiff * lonDiff + latDiff * latDiff);
+    } else {
+        centerDiff = CLOSEST_DISTANCE_THRESHOLD + 1;
+    }
+    
+    if (zoomDiff > ZOOM_DIFFERENCE_THRESHOLD || centerDiff > CLOSEST_DISTANCE_THRESHOLD) {
         sync3DTo2DIsSyncing = true;
-        var coord = ol.proj.fromLonLat([lon, lat]);
         view.animate({
-            center: coord,
+            center: targetCoord,
             zoom: targetZoom,
             duration: ANIMATION_DURATION
         });
