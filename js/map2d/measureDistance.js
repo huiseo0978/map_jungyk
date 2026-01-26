@@ -1111,6 +1111,9 @@ function clearMeasures() {
         measurePointsArray = [];
     }
     
+    measureResultsArray = [];
+    lastMeasureResult = null;
+    
     isMeasuringNow = false;
     if (measureClickEventHandler) {
         try {
@@ -1328,8 +1331,9 @@ function convertMeasureResultsTo2D() {
                     });
                     const pointStyleFor2D = new ol.style.Style({
                         image: new ol.style.Circle({
-                            radius: 5,
-                            fill: new ol.style.Fill({ color: '#ffcc33' })
+                            radius: 6,
+                            fill: new ol.style.Fill({ color: 'rgba(0, 0, 255, 0.8)' }),
+                            stroke: new ol.style.Stroke({ color: 'white', width: 2 })
                         })
                     });
                     pointFeatureFor2D.setStyle(pointStyleFor2D);

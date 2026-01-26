@@ -78,6 +78,7 @@ function heightToZoom(cameraHeight, latRad, mapSize, mainView) {
     return zoom;
 }
 
+
 function sync3DTo2D(params) {
     if (!params || typeof params != 'object') {
         return;
@@ -92,6 +93,7 @@ function sync3DTo2D(params) {
     if (sync3DTo2DIsSyncing) {
         return;
     }
+
     if (!is3D || !map || !view) {
         return;
     }
@@ -135,7 +137,8 @@ function sync2DTo3D(params) {
     if (isSyncingZoom) {
         return;
     }
-    if (is3D || !cesiumViewer) {
+
+    if (!is3D || !cesiumViewer) {
         return;
     }
     if (!lonlat || targetHeight == null) {

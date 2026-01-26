@@ -18,14 +18,7 @@ const cityLayer = new ol.layer.Vector({
 
 const measureSource = new ol.source.Vector();
 const measureLayer = new ol.layer.Vector({
-    source: measureSource,
-    style: new ol.style.Style({
-        stroke: new ol.style.Stroke({ color: '#ffcc33', width: 3 }),
-        image: new ol.style.Circle({
-            radius: 5,
-            fill: new ol.style.Fill({ color: '#ffcc33' })
-        })
-    })
+    source: measureSource
 });
 
 const map = new ol.Map({
