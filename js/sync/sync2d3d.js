@@ -69,7 +69,7 @@ function heightToZoom(cameraHeight, latRad, mapSize, mainView) {
     }
     
     var cosLat = Math.cos(latRad);
-    if (!isFinite(cosLat) || cosLat <= 0) {
+    if (!isFinite(cosLat) || cosLat <= COS_LAT_THRESHOLD) {
         return DEFAULT_ZOOM_LEVEL;
     }
     
@@ -150,17 +150,16 @@ function sync3DTo2D(params) {
     
     var currentCenter = view.getCenter();
     var targetCoord = ol.proj.fromLonLat([lon, lat]);
-    var centerDiff = 0;
+    var centerDiffMeters = 0;
     if (currentCenter) {
-        var currentLonLat = ol.proj.toLonLat(currentCenter);
-        var lonDiff = Math.abs(currentLonLat[0] - lon);
-        var latDiff = Math.abs(currentLonLat[1] - lat);
-        centerDiff = Math.sqrt(lonDiff * lonDiff + latDiff * latDiff);
+        var dx = targetCoord[0] - currentCenter[0];
+        var dy = targetCoord[1] - currentCenter[1];
+        centerDiffMeters = Math.sqrt(dx * dx + dy * dy);
     } else {
-        centerDiff = CLOSEST_DISTANCE_THRESHOLD + 1;
+        centerDiffMeters = CENTER_SYNC_DISTANCE_THRESHOLD_METERS + 1;
     }
     
-    if (zoomDiff > ZOOM_DIFFERENCE_THRESHOLD || centerDiff > CLOSEST_DISTANCE_THRESHOLD) {
+    if (zoomDiff > ZOOM_DIFFERENCE_THRESHOLD || centerDiffMeters > CENTER_SYNC_DISTANCE_THRESHOLD_METERS) {
         sync3DTo2DIsSyncing = true;
         view.animate({
             center: targetCoord,
