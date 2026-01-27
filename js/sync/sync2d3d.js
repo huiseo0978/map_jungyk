@@ -180,14 +180,14 @@ function sync2DTo3D(params) {
     
     var lonlat = params.lonlat;
     var targetHeight = params.targetHeight;
-    var cesiumViewer = params.cesiumViewer;
+    var cesiumViewerParam = params.cesiumViewer;
     var is3D = params.is3DModeActive;
     
     if (isSyncingZoom) {
         return;
     }
 
-    if (!is3D || !cesiumViewer) {
+    if (!is3D || !cesiumViewerParam) {
         return;
     }
     if (!lonlat || targetHeight == null) {
@@ -195,7 +195,7 @@ function sync2DTo3D(params) {
     }
     
     isSyncingZoom = true;
-    cesiumViewer.camera.flyTo({
+    cesiumViewerParam.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(lonlat[0], lonlat[1], targetHeight),
         duration: 0.3
     });
