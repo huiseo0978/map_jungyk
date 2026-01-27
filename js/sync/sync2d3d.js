@@ -1,4 +1,5 @@
 (function() {
+var COS_LAT_THRESHOLD = 1e-6;
 var sync3DTo2DIsSyncing = false;
 var isSyncingZoom = false;
 
