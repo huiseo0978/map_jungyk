@@ -502,6 +502,9 @@ function finishMeasure3DFunction() {
         for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
             const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
             if (currentEntity) {
+                if (currentEntity.point) {
+                    currentEntity.point.pixelSize = 12;
+                }
                 savedPointEntitiesArray.push(currentEntity);
             }
         }
@@ -1311,7 +1314,7 @@ function convertMeasureResultsTo2D() {
                 const lineGeometryFor2D = new ol.geom.LineString(positionsArrayFor2D);
                 const lineStyleFor2D = new ol.style.Style({
                     stroke: new ol.style.Stroke({
-                        color: '#ffcc33',
+                        color: 'rgba(0, 0, 255, 0.6)',
                         width: 3
                     })
                 });
