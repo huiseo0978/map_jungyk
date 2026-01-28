@@ -57,15 +57,6 @@ function stopMeasureFunction() {
 }
 
 function stopMeasure2DFunction() {
-    if (!map) {
-        measureClickEventHandler = null;
-        measureDrawInteraction = null;
-        measureTooltipOverlayElement = null;
-        measureTooltipOverlay = null;
-        measureCurrentLineFeature = null;
-        measurePointFeaturesArray = [];
-        return;
-    }
     if (measureClickEventHandler) {
         try {
             map.un('click', measureClickEventHandler);
@@ -117,14 +108,27 @@ function stopMeasure3DFunction() {
         for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
             const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
             if (currentEntity) {
-                cesiumViewer.entities.remove(currentEntity);
+                try {
+                    cesiumViewer.entities.remove(currentEntity);
+                } catch (error) {
+                }
             }
         }
         if (cesiumMeasurePolylineEntity) {
-            cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
+            try {
+                cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
+            } catch (error) {
+            }
             cesiumMeasurePolylineEntity = null;
         }
-}
+        if (cesiumMeasureTooltipLabel) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+            } catch (error) {
+            }
+            cesiumMeasureTooltipLabel = null;
+        }
+    }
     cesiumMeasureEntitiesArray = [];
 }
 
