@@ -105,14 +105,12 @@ function stopMeasure3DFunction() {
         if (cesiumCanvasElement) {
             cesiumCanvasElement.style.cursor = '';
         }
-        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
-            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
-            if (currentEntity) {
-                try {
-                    cesiumViewer.entities.remove(currentEntity);
-                } catch (error) {
-                }
+        if (cesiumMeasureTooltipLabel) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+            } catch (error) {
             }
+            cesiumMeasureTooltipLabel = null;
         }
         if (cesiumMeasurePolylineEntity) {
             try {
@@ -121,12 +119,14 @@ function stopMeasure3DFunction() {
             }
             cesiumMeasurePolylineEntity = null;
         }
-        if (cesiumMeasureTooltipLabel) {
-            try {
-                cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
-            } catch (error) {
+        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
+            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
+            if (currentEntity) {
+                try {
+                    cesiumViewer.entities.remove(currentEntity);
+                } catch (error) {
+                }
             }
-            cesiumMeasureTooltipLabel = null;
         }
     }
     cesiumMeasureEntitiesArray = [];
@@ -271,6 +271,9 @@ function continueMeasureFromResult(targetResultId) {
 }
 
 function startMeasure2D() {
+    if (!map) {
+        return;
+    }
     measureClickEventHandler = function(clickEvent) {
         handleMeasureClickFunction(clickEvent);
     };
@@ -324,6 +327,9 @@ function startMeasure3D() {
 
 function handleMeasureClickFunction(event) {
     if (!isMeasuringNow) {
+        return;
+    }
+    if (!map) {
         return;
     }
     
@@ -385,6 +391,9 @@ function finishMeasureFunction() {
 }
 
 function finishMeasure2DFunction() {
+    if (!map) {
+        return;
+    }
     if (measurePointsArray.length >= 2) {
         const lineGeometry = new ol.geom.LineString(measurePointsArray);
         const distanceText = formatLength(lineGeometry);
@@ -709,6 +718,9 @@ function formatLength(lineGeometry) {
 }
 
 function createMeasureTooltipFunction() {
+    if (!map) {
+        return;
+    }
     if (measureTooltipOverlay) {
         map.removeOverlay(measureTooltipOverlay);
         measureTooltipOverlay = null;
@@ -822,17 +834,22 @@ function removeMeasureItem(targetResultId) {
                 
                 const removedCoord = currentItem.coord;
                 let removedPointIndex = -1;
+                const coordinateTolerance = 0.0001;
                 
                 for (let pointIndex = 0; pointIndex < measurePointsArray.length; pointIndex = pointIndex + 1) {
                     if (is3DModeActive) {
-                        if (measurePointsArray[pointIndex][0] === removedCoord[0] && measurePointsArray[pointIndex][1] === removedCoord[1]) {
+                        const coordDiffLon = Math.abs(measurePointsArray[pointIndex][0] - removedCoord[0]);
+                        const coordDiffLat = Math.abs(measurePointsArray[pointIndex][1] - removedCoord[1]);
+                        if (coordDiffLon < coordinateTolerance && coordDiffLat < coordinateTolerance) {
                             removedPointIndex = pointIndex;
                             measurePointsArray.splice(pointIndex, 1);
                             break;
                         }
                     } else {
                         const currentPointLonLat = ol.proj.toLonLat(measurePointsArray[pointIndex]);
-                        if (currentPointLonLat[0] === removedCoord[0] && currentPointLonLat[1] === removedCoord[1]) {
+                        const coordDiffLon = Math.abs(currentPointLonLat[0] - removedCoord[0]);
+                        const coordDiffLat = Math.abs(currentPointLonLat[1] - removedCoord[1]);
+                        if (coordDiffLon < coordinateTolerance && coordDiffLat < coordinateTolerance) {
                             removedPointIndex = pointIndex;
                             measurePointsArray.splice(pointIndex, 1);
                             break;
@@ -935,7 +952,7 @@ function removeMeasureItem(targetResultId) {
                             const calculatedDistance = formatLength(currentLineGeometry);
                             if (measureTooltipOverlayElement) {
                                 measureTooltipOverlayElement.innerHTML = calculatedDistance;
-                                if (measurePointsArray.length > 0) {
+                                if (measurePointsArray.length > 0 && measureTooltipOverlay) {
                                     const lastPointCoordinate = measurePointsArray[measurePointsArray.length - 1];
                                     measureTooltipOverlay.setPosition(lastPointCoordinate);
                                 }
@@ -947,7 +964,7 @@ function removeMeasureItem(targetResultId) {
                                 }
                                 measureTooltipOverlayElement = null;
                             }
-                            if (measureTooltipOverlay) {
+                            if (measureTooltipOverlay && map) {
                                 map.removeOverlay(measureTooltipOverlay);
                                 measureTooltipOverlay = null;
                             }
@@ -1089,6 +1106,12 @@ function clearMeasures() {
         cesiumMeasureEntitiesArray = [];
         measurePointsArray = [];
     } else {
+        if (!map) {
+            measureResultsArray = [];
+            lastMeasureResult = null;
+            isMeasuringNow = false;
+            return;
+        }
         for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
             const currentResult = measureResultsArray[resultIndex];
             if (currentResult.feature) {
@@ -1132,14 +1155,18 @@ function clearMeasures() {
     
     isMeasuringNow = false;
     if (measureClickEventHandler) {
-        try {
-            map.un('click', measureClickEventHandler);
-        } catch (error) {
+        if (map) {
+            try {
+                map.un('click', measureClickEventHandler);
+            } catch (error) {
+            }
         }
         measureClickEventHandler = null;
     }
     if (measureDrawInteraction) {
-        map.removeInteraction(measureDrawInteraction);
+        if (map) {
+            map.removeInteraction(measureDrawInteraction);
+        }
         measureDrawInteraction = null;
     }
     if (cesiumMeasureClickHandler) {
@@ -1147,9 +1174,11 @@ function clearMeasures() {
         cesiumMeasureClickHandler = null;
     }
     
-    const mapElement = map.getTargetElement();
-    if (mapElement) {
-        mapElement.style.cursor = '';
+    if (map) {
+        const mapElement = map.getTargetElement();
+        if (mapElement) {
+            mapElement.style.cursor = '';
+        }
     }
     if (cesiumViewer) {
         const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -1164,204 +1193,186 @@ function clearMeasures() {
     updateMeasureListFunction();
 }
 
-function convertMeasureResultsTo3D() {
+function clearAll2DMeasureObjects() {
+    if (!map || !measureSource) {
+        return;
+    }
+    const allMeasureFeatures = measureSource.getFeatures();
+    for (let featureIndex = allMeasureFeatures.length - 1; featureIndex >= 0; featureIndex = featureIndex - 1) {
+        const currentFeature = allMeasureFeatures[featureIndex];
+        if (currentFeature) {
+            measureSource.removeFeature(currentFeature);
+        }
+    }
+}
+
+function clearAll3DMeasureObjects() {
     if (!cesiumViewer) {
         return;
     }
-    
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
         const currentItem = measureResultsArray[resultIndex];
-        if (currentItem && !currentItem.isPoint && currentItem.pointsArray) {
-            if (currentItem.feature && currentItem.pointFeatures) {
-                if (currentItem.feature) {
-                    measureSource.removeFeature(currentItem.feature);
+        if (currentItem) {
+            if (currentItem.feature) {
+                try {
+                    cesiumViewer.entities.remove(currentItem.feature);
+                } catch (error) {
                 }
-                if (currentItem.pointFeatures) {
-                    for (let featureIndex = 0; featureIndex < currentItem.pointFeatures.length; featureIndex = featureIndex + 1) {
-                        const currentFeature = currentItem.pointFeatures[featureIndex];
-                        if (currentFeature) {
+            }
+            if (currentItem.labelEntity) {
+                try {
+                    cesiumViewer.entities.remove(currentItem.labelEntity);
+                } catch (error) {
+                }
+            }
+            if (currentItem.pointEntities) {
+                for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
+                    const currentEntity = currentItem.pointEntities[entityIndex];
+                    if (currentEntity) {
+                        try {
+                            cesiumViewer.entities.remove(currentEntity);
+                        } catch (error) {
+                        }
+                    }
+                }
+            }
+            if (currentItem.pointFeatures) {
+                for (let featureIndex = 0; featureIndex < currentItem.pointFeatures.length; featureIndex = featureIndex + 1) {
+                    const currentFeature = currentItem.pointFeatures[featureIndex];
+                    if (currentFeature && measureSource) {
+                        try {
                             measureSource.removeFeature(currentFeature);
+                        } catch (error) {
                         }
                     }
                 }
-            }
-            if (currentItem.feature && currentItem.pointEntities) {
-                if (currentItem.feature) {
-                    try {
-                        cesiumViewer.entities.remove(currentItem.feature);
-                    } catch (error) {
-                    }
-                }
-                if (currentItem.labelEntity) {
-                    try {
-                        cesiumViewer.entities.remove(currentItem.labelEntity);
-                    } catch (error) {
-                    }
-                }
-                if (currentItem.pointEntities) {
-                    for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
-                        const currentEntity = currentItem.pointEntities[entityIndex];
-                        if (currentEntity) {
-                            try {
-                                cesiumViewer.entities.remove(currentEntity);
-                            } catch (error) {
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (currentItem.pointsArray && currentItem.pointsArray.length >= 2) {
-                const positionsArrayFor3D = [];
-                const pointEntitiesArrayFor3D = [];
-                for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
-                    const currentPointLonLat = currentItem.pointsArray[pointIndex];
-                    const cartographicPosition = Cesium.Cartographic.fromDegrees(currentPointLonLat[0], currentPointLonLat[1]);
-                    const cartesianPosition = Cesium.Cartesian3.fromRadians(cartographicPosition.longitude, cartographicPosition.latitude);
-                    positionsArrayFor3D.push(cartesianPosition);
-                    
-                    const pointEntity = cesiumViewer.entities.add({
-                        position: cartesianPosition,
-                        point: {
-                            pixelSize: 12,
-                            color: Cesium.Color.BLUE.withAlpha(0.8),
-                            outlineColor: Cesium.Color.WHITE,
-                            outlineWidth: 2,
-                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
-                        }
-                    });
-                    pointEntitiesArrayFor3D.push(pointEntity);
-                }
-                
-                let polylineEntityFor3D = null;
-                let labelEntityFor3D = null;
-                if (positionsArrayFor3D.length >= 2) {
-                    polylineEntityFor3D = cesiumViewer.entities.add({
-                        polyline: {
-                            positions: positionsArrayFor3D,
-                            width: 3,
-                            material: Cesium.Color.BLUE.withAlpha(0.8),
-                            clampToGround: true
-                        }
-                    });
-                    
-                    const lastPosition = positionsArrayFor3D[positionsArrayFor3D.length - 1];
-                    const distanceText = currentItem.text;
-                    labelEntityFor3D = cesiumViewer.entities.add({
-                        position: lastPosition,
-                        label: {
-                            text: distanceText,
-                            font: '12px sans-serif',
-                            fillColor: Cesium.Color.WHITE,
-                            outlineColor: Cesium.Color.BLACK,
-                            outlineWidth: 2,
-                            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                            pixelOffset: new Cesium.Cartesian2(0, -40),
-                            disableDepthTestDistance: Number.POSITIVE_INFINITY
-                        }
-                    });
-                }
-                
-                currentItem.feature = polylineEntityFor3D;
-                currentItem.pointFeatures = null;
-                currentItem.pointEntities = pointEntitiesArrayFor3D;
-                currentItem.labelEntity = labelEntityFor3D;
             }
         }
     }
 }
 
-function convertMeasureResultsTo2D() {
+function convertMeasureResultsTo3D() {
+    if (!cesiumViewer) {
+        return;
+    }
+    
+    clearAll2DMeasureObjects();
+    
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
         const currentItem = measureResultsArray[resultIndex];
-        if (currentItem && !currentItem.isPoint && currentItem.pointsArray) {
-            if (currentItem.feature && currentItem.pointFeatures) {
-                if (currentItem.feature) {
-                    measureSource.removeFeature(currentItem.feature);
-                }
-                if (currentItem.pointFeatures) {
-                    for (let featureIndex = 0; featureIndex < currentItem.pointFeatures.length; featureIndex = featureIndex + 1) {
-                        const currentFeature = currentItem.pointFeatures[featureIndex];
-                        if (currentFeature) {
-                            measureSource.removeFeature(currentFeature);
-                        }
+        if (currentItem && !currentItem.isPoint && currentItem.pointsArray && currentItem.pointsArray.length >= 2) {
+            const positionsArrayFor3D = [];
+            const pointEntitiesArrayFor3D = [];
+            for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
+                const currentPointLonLat = currentItem.pointsArray[pointIndex];
+                const cartographicPosition = Cesium.Cartographic.fromDegrees(currentPointLonLat[0], currentPointLonLat[1]);
+                const cartesianPosition = Cesium.Cartesian3.fromRadians(cartographicPosition.longitude, cartographicPosition.latitude);
+                positionsArrayFor3D.push(cartesianPosition);
+                
+                const pointEntity = cesiumViewer.entities.add({
+                    position: cartesianPosition,
+                    point: {
+                        pixelSize: 12,
+                        color: Cesium.Color.BLUE.withAlpha(0.8),
+                        outlineColor: Cesium.Color.WHITE,
+                        outlineWidth: 2,
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
                     }
-                }
-            }
-            if (currentItem.feature && currentItem.pointEntities) {
-                if (cesiumViewer) {
-                    if (currentItem.feature) {
-                        try {
-                            cesiumViewer.entities.remove(currentItem.feature);
-                        } catch (error) {
-                        }
-                    }
-                    if (currentItem.labelEntity) {
-                        try {
-                            cesiumViewer.entities.remove(currentItem.labelEntity);
-                        } catch (error) {
-                        }
-                    }
-                    if (currentItem.pointEntities) {
-                        for (let entityIndex = 0; entityIndex < currentItem.pointEntities.length; entityIndex = entityIndex + 1) {
-                            const currentEntity = currentItem.pointEntities[entityIndex];
-                            if (currentEntity) {
-                                try {
-                                    cesiumViewer.entities.remove(currentEntity);
-                                } catch (error) {
-                                }
-                            }
-                        }
-                    }
-                }
+                });
+                pointEntitiesArrayFor3D.push(pointEntity);
             }
             
-            if (currentItem.pointsArray && currentItem.pointsArray.length >= 2 && (!currentItem.feature || currentItem.pointEntities)) {
-                const positionsArrayFor2D = [];
-                for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
-                    const currentPointLonLat = currentItem.pointsArray[pointIndex];
-                    const coordinateFor2D = ol.proj.fromLonLat(currentPointLonLat);
-                    positionsArrayFor2D.push(coordinateFor2D);
-                }
+            let polylineEntityFor3D = null;
+            let labelEntityFor3D = null;
+            if (positionsArrayFor3D.length >= 2) {
+                polylineEntityFor3D = cesiumViewer.entities.add({
+                    polyline: {
+                        positions: positionsArrayFor3D,
+                        width: 3,
+                        material: Cesium.Color.BLUE.withAlpha(0.8),
+                        clampToGround: true
+                    }
+                });
                 
-                const lineGeometryFor2D = new ol.geom.LineString(positionsArrayFor2D);
-                const lineStyleFor2D = new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'rgba(0, 0, 255, 0.6)',
-                        width: 3
+                const lastPosition = positionsArrayFor3D[positionsArrayFor3D.length - 1];
+                const distanceText = currentItem.text;
+                labelEntityFor3D = cesiumViewer.entities.add({
+                    position: lastPosition,
+                    label: {
+                        text: distanceText,
+                        font: '12px sans-serif',
+                        fillColor: Cesium.Color.WHITE,
+                        outlineColor: Cesium.Color.BLACK,
+                        outlineWidth: 2,
+                        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                        pixelOffset: new Cesium.Cartesian2(0, -40),
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY
+                    }
+                });
+            }
+            
+            currentItem.feature = polylineEntityFor3D;
+            currentItem.pointFeatures = null;
+            currentItem.pointEntities = pointEntitiesArrayFor3D;
+            currentItem.labelEntity = labelEntityFor3D;
+        }
+    }
+}
+
+function convertMeasureResultsTo2D() {
+    if (!map || !measureSource) {
+        return;
+    }
+    
+    clearAll3DMeasureObjects();
+    
+    for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
+        const currentItem = measureResultsArray[resultIndex];
+        if (currentItem && !currentItem.isPoint && currentItem.pointsArray && currentItem.pointsArray.length >= 2) {
+            const positionsArrayFor2D = [];
+            for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
+                const currentPointLonLat = currentItem.pointsArray[pointIndex];
+                const coordinateFor2D = ol.proj.fromLonLat(currentPointLonLat);
+                positionsArrayFor2D.push(coordinateFor2D);
+            }
+            
+            const lineGeometryFor2D = new ol.geom.LineString(positionsArrayFor2D);
+            const lineStyleFor2D = new ol.style.Style({
+                stroke: new ol.style.Stroke({
+                    color: 'rgba(0, 0, 255, 0.6)',
+                    width: 3
+                })
+            });
+            
+            const lineFeatureFor2D = new ol.Feature({
+                geometry: lineGeometryFor2D
+            });
+            lineFeatureFor2D.setStyle(lineStyleFor2D);
+            measureSource.addFeature(lineFeatureFor2D);
+            
+            const pointFeaturesArrayFor2D = [];
+            for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
+                const currentPointLonLat = currentItem.pointsArray[pointIndex];
+                const coordinateFor2D = ol.proj.fromLonLat(currentPointLonLat);
+                const pointFeatureFor2D = new ol.Feature({
+                    geometry: new ol.geom.Point(coordinateFor2D)
+                });
+                const pointStyleFor2D = new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 6,
+                        fill: new ol.style.Fill({ color: 'rgba(0, 0, 255, 0.8)' }),
+                        stroke: new ol.style.Stroke({ color: 'white', width: 2 })
                     })
                 });
-                
-                const lineFeatureFor2D = new ol.Feature({
-                    geometry: lineGeometryFor2D
-                });
-                lineFeatureFor2D.setStyle(lineStyleFor2D);
-                measureSource.addFeature(lineFeatureFor2D);
-                
-                const pointFeaturesArrayFor2D = [];
-                for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
-                    const currentPointLonLat = currentItem.pointsArray[pointIndex];
-                    const coordinateFor2D = ol.proj.fromLonLat(currentPointLonLat);
-                    const pointFeatureFor2D = new ol.Feature({
-                        geometry: new ol.geom.Point(coordinateFor2D)
-                    });
-                    const pointStyleFor2D = new ol.style.Style({
-                        image: new ol.style.Circle({
-                            radius: 6,
-                            fill: new ol.style.Fill({ color: 'rgba(0, 0, 255, 0.8)' }),
-                            stroke: new ol.style.Stroke({ color: 'white', width: 2 })
-                        })
-                    });
-                    pointFeatureFor2D.setStyle(pointStyleFor2D);
-                    measureSource.addFeature(pointFeatureFor2D);
-                    pointFeaturesArrayFor2D.push(pointFeatureFor2D);
-                }
-                
-                currentItem.feature = lineFeatureFor2D;
-                currentItem.pointFeatures = pointFeaturesArrayFor2D;
-                currentItem.pointEntities = null;
-                currentItem.labelEntity = null;
+                pointFeatureFor2D.setStyle(pointStyleFor2D);
+                measureSource.addFeature(pointFeatureFor2D);
+                pointFeaturesArrayFor2D.push(pointFeatureFor2D);
             }
+            
+            currentItem.feature = lineFeatureFor2D;
+            currentItem.pointFeatures = pointFeaturesArrayFor2D;
+            currentItem.pointEntities = null;
+            currentItem.labelEntity = null;
         }
     }
     
