@@ -57,6 +57,15 @@ function stopMeasureFunction() {
 }
 
 function stopMeasure2DFunction() {
+    if (!map) {
+        measureClickEventHandler = null;
+        measureDrawInteraction = null;
+        measureTooltipOverlayElement = null;
+        measureTooltipOverlay = null;
+        measureCurrentLineFeature = null;
+        measurePointFeaturesArray = [];
+        return;
+    }
     if (measureClickEventHandler) {
         try {
             map.un('click', measureClickEventHandler);
