@@ -300,6 +300,13 @@ function startMeasure2D() {
     if (!map) {
         return;
     }
+    if (measureClickEventHandler) {
+        try {
+            map.un('click', measureClickEventHandler);
+        } catch (error) {
+        }
+        measureClickEventHandler = null;
+    }
     measureClickEventHandler = function(clickEvent) {
         handleMeasureClickFunction(clickEvent);
     };
@@ -329,6 +336,19 @@ function startMeasure2D() {
 function startMeasure3D() {
     if (cesiumViewer === null) {
         return;
+    }
+    
+    if (cesiumMeasureClickHandler) {
+        cesiumMeasureClickHandler.destroy();
+        cesiumMeasureClickHandler = null;
+    }
+    
+    if (cesiumMeasurePolylineEntity) {
+        try {
+            cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
+        } catch (error) {
+        }
+        cesiumMeasurePolylineEntity = null;
     }
     
     const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -1375,6 +1395,7 @@ function clearAll2DMeasureResultObjects() {
 }
 
 function clearAll3DMeasureObjects() {
+    clearTemporary3DMeasureObjects();
     if (!cesiumViewer) {
         return;
     }
