@@ -62,7 +62,18 @@ function stopMeasure2DFunction() {
         measureDrawInteraction = null;
         measureTooltipOverlayElement = null;
         measureTooltipOverlay = null;
+        if (measureCurrentLineFeature && measureSource) {
+            measureSource.removeFeature(measureCurrentLineFeature);
+        }
         measureCurrentLineFeature = null;
+        if (measureSource) {
+            for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
+                const currentPointFeature = measurePointFeaturesArray[pointIndex];
+                if (currentPointFeature) {
+                    measureSource.removeFeature(currentPointFeature);
+                }
+            }
+        }
         measurePointFeaturesArray = [];
         return;
     }
@@ -176,6 +187,10 @@ function continueMeasureFromResult(targetResultId) {
                 cesiumMeasureEntitiesArray = [];
                 
                 if (is3DModeActive) {
+                    if (!cesiumViewer) {
+                        isMeasuringNow = false;
+                        return;
+                    }
                     for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
                         const currentPoint = currentItem.pointsArray[pointIndex];
                         const cartographicPosition = Cesium.Cartographic.fromDegrees(currentPoint[0], currentPoint[1]);
@@ -1232,14 +1247,41 @@ function clearTemporary2DMeasureObjects() {
         measureTooltipOverlay = null;
     }
     if (measureCurrentLineFeature && measureSource) {
-        measureSource.removeFeature(measureCurrentLineFeature);
+        let isInResults = false;
+        for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
+            const currentResult = measureResultsArray[resultIndex];
+            if (currentResult && currentResult.feature === measureCurrentLineFeature) {
+                isInResults = true;
+                break;
+            }
+        }
+        if (!isInResults) {
+            measureSource.removeFeature(measureCurrentLineFeature);
+        }
         measureCurrentLineFeature = null;
     }
     if (measureSource) {
         for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
             const currentPointFeature = measurePointFeaturesArray[pointIndex];
             if (currentPointFeature) {
-                measureSource.removeFeature(currentPointFeature);
+                let isInResults = false;
+                for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
+                    const currentResult = measureResultsArray[resultIndex];
+                    if (currentResult && currentResult.pointFeatures) {
+                        for (let pfIndex = 0; pfIndex < currentResult.pointFeatures.length; pfIndex = pfIndex + 1) {
+                            if (currentResult.pointFeatures[pfIndex] === currentPointFeature) {
+                                isInResults = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isInResults) {
+                        break;
+                    }
+                }
+                if (!isInResults) {
+                    measureSource.removeFeature(currentPointFeature);
+                }
             }
         }
     }
@@ -1383,7 +1425,6 @@ function convertMeasureResultsTo3D() {
     }
     
     clearTemporary2DMeasureObjects();
-    clearAll2DMeasureResultObjects();
     
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
         const currentItem = measureResultsArray[resultIndex];
@@ -1452,7 +1493,6 @@ function convertMeasureResultsTo2D() {
     }
     
     clearTemporary3DMeasureObjects();
-    clearAll3DMeasureObjects();
     
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
         const currentItem = measureResultsArray[resultIndex];
