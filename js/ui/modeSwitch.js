@@ -4,6 +4,12 @@ function toggle3D(is3DEnabled) {
     const cesiumContainerElement = document.getElementById("cesiumContainer");
 
     if (is3DEnabled) {
+        if (typeof isMeasuringNow !== 'undefined' && isMeasuringNow) {
+            if (typeof stopMeasureFunction === 'function') {
+                stopMeasureFunction();
+            }
+        }
+        
         let targetLonlat = mapCenter;
         let targetHeight = DEFAULT_CAMERA_HEIGHT;
         
@@ -54,6 +60,12 @@ function toggle3D(is3DEnabled) {
     }
     
     if (!is3DEnabled) {
+        if (typeof isMeasuringNow !== 'undefined' && isMeasuringNow) {
+            if (typeof stopMeasureFunction === 'function') {
+                stopMeasureFunction();
+            }
+        }
+        
         if (typeof teardownCesiumEvents === 'function') {
             teardownCesiumEvents();
         }

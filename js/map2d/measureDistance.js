@@ -57,6 +57,15 @@ function stopMeasureFunction() {
 }
 
 function stopMeasure2DFunction() {
+    if (!map) {
+        measureClickEventHandler = null;
+        measureDrawInteraction = null;
+        measureTooltipOverlayElement = null;
+        measureTooltipOverlay = null;
+        measureCurrentLineFeature = null;
+        measurePointFeaturesArray = [];
+        return;
+    }
     if (measureClickEventHandler) {
         try {
             map.un('click', measureClickEventHandler);
@@ -78,14 +87,16 @@ function stopMeasure2DFunction() {
         map.removeOverlay(measureTooltipOverlay);
         measureTooltipOverlay = null;
     }
-    if (measureCurrentLineFeature) {
+    if (measureCurrentLineFeature && measureSource) {
         measureSource.removeFeature(measureCurrentLineFeature);
         measureCurrentLineFeature = null;
     }
-    for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
-        const currentPointFeature = measurePointFeaturesArray[pointIndex];
-        if (currentPointFeature) {
-            measureSource.removeFeature(currentPointFeature);
+    if (measureSource) {
+        for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
+            const currentPointFeature = measurePointFeaturesArray[pointIndex];
+            if (currentPointFeature) {
+                measureSource.removeFeature(currentPointFeature);
+            }
         }
     }
     measurePointFeaturesArray = [];
@@ -549,7 +560,12 @@ function finishMeasure3DFunction() {
             cesiumMeasurePolylineEntity = null;
         }
         if (cesiumMeasureTooltipLabel) {
-            cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+            if (cesiumViewer) {
+                try {
+                    cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+                } catch (error) {
+                }
+            }
             cesiumMeasureTooltipLabel = null;
         }
         
@@ -1193,7 +1209,88 @@ function clearMeasures() {
     updateMeasureListFunction();
 }
 
+function clearTemporary2DMeasureObjects() {
+    if (measureClickEventHandler && map) {
+        try {
+            map.un('click', measureClickEventHandler);
+        } catch (error) {
+        }
+        measureClickEventHandler = null;
+    }
+    if (measureDrawInteraction && map) {
+        map.removeInteraction(measureDrawInteraction);
+        measureDrawInteraction = null;
+    }
+    if (measureTooltipOverlayElement) {
+        if (measureTooltipOverlayElement.parentNode) {
+            measureTooltipOverlayElement.parentNode.removeChild(measureTooltipOverlayElement);
+        }
+        measureTooltipOverlayElement = null;
+    }
+    if (measureTooltipOverlay && map) {
+        map.removeOverlay(measureTooltipOverlay);
+        measureTooltipOverlay = null;
+    }
+    if (measureCurrentLineFeature && measureSource) {
+        measureSource.removeFeature(measureCurrentLineFeature);
+        measureCurrentLineFeature = null;
+    }
+    if (measureSource) {
+        for (let pointIndex = 0; pointIndex < measurePointFeaturesArray.length; pointIndex = pointIndex + 1) {
+            const currentPointFeature = measurePointFeaturesArray[pointIndex];
+            if (currentPointFeature) {
+                measureSource.removeFeature(currentPointFeature);
+            }
+        }
+    }
+    measurePointFeaturesArray = [];
+    if (map) {
+        const mapElement = map.getTargetElement();
+        if (mapElement) {
+            mapElement.style.cursor = '';
+        }
+    }
+}
+
+function clearTemporary3DMeasureObjects() {
+    if (cesiumMeasureClickHandler) {
+        cesiumMeasureClickHandler.destroy();
+        cesiumMeasureClickHandler = null;
+    }
+    if (cesiumViewer) {
+        const cesiumCanvasElement = cesiumViewer.scene.canvas;
+        if (cesiumCanvasElement) {
+            cesiumCanvasElement.style.cursor = '';
+        }
+        if (cesiumMeasureTooltipLabel) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+            } catch (error) {
+            }
+            cesiumMeasureTooltipLabel = null;
+        }
+        if (cesiumMeasurePolylineEntity) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
+            } catch (error) {
+            }
+            cesiumMeasurePolylineEntity = null;
+        }
+        for (let entityIndex = 0; entityIndex < cesiumMeasureEntitiesArray.length; entityIndex = entityIndex + 1) {
+            const currentEntity = cesiumMeasureEntitiesArray[entityIndex];
+            if (currentEntity) {
+                try {
+                    cesiumViewer.entities.remove(currentEntity);
+                } catch (error) {
+                }
+            }
+        }
+    }
+    cesiumMeasureEntitiesArray = [];
+}
+
 function clearAll2DMeasureObjects() {
+    clearTemporary2DMeasureObjects();
     if (!map || !measureSource) {
         return;
     }
@@ -1201,6 +1298,35 @@ function clearAll2DMeasureObjects() {
     for (let featureIndex = allMeasureFeatures.length - 1; featureIndex >= 0; featureIndex = featureIndex - 1) {
         const currentFeature = allMeasureFeatures[featureIndex];
         if (currentFeature) {
+            measureSource.removeFeature(currentFeature);
+        }
+    }
+}
+
+function clearAll2DMeasureResultObjects() {
+    if (!map || !measureSource) {
+        return;
+    }
+    const allMeasureFeatures = measureSource.getFeatures();
+    for (let featureIndex = allMeasureFeatures.length - 1; featureIndex >= 0; featureIndex = featureIndex - 1) {
+        const currentFeature = allMeasureFeatures[featureIndex];
+        let isInResults = false;
+        for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
+            const currentResult = measureResultsArray[resultIndex];
+            if (currentResult && currentResult.feature === currentFeature) {
+                isInResults = true;
+                break;
+            }
+            if (currentResult && currentResult.pointFeatures) {
+                for (let pointIndex = 0; pointIndex < currentResult.pointFeatures.length; pointIndex = pointIndex + 1) {
+                    if (currentResult.pointFeatures[pointIndex] === currentFeature) {
+                        isInResults = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!isInResults) {
             measureSource.removeFeature(currentFeature);
         }
     }
@@ -1256,7 +1382,8 @@ function convertMeasureResultsTo3D() {
         return;
     }
     
-    clearAll2DMeasureObjects();
+    clearTemporary2DMeasureObjects();
+    clearAll2DMeasureResultObjects();
     
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
         const currentItem = measureResultsArray[resultIndex];
@@ -1324,6 +1451,7 @@ function convertMeasureResultsTo2D() {
         return;
     }
     
+    clearTemporary3DMeasureObjects();
     clearAll3DMeasureObjects();
     
     for (let resultIndex = 0; resultIndex < measureResultsArray.length; resultIndex = resultIndex + 1) {
