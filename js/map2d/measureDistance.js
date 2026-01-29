@@ -247,6 +247,10 @@ function continueMeasureFromResult(targetResultId) {
                     }
                     startMeasure3D();
                 } else {
+                    if (!measureSource) {
+                        isMeasuringNow = false;
+                        return;
+                    }
                     for (let pointIndex = 0; pointIndex < currentItem.pointsArray.length; pointIndex = pointIndex + 1) {
                         const currentPoint = currentItem.pointsArray[pointIndex];
                         const coordinate = ol.proj.fromLonLat(currentPoint);
@@ -288,7 +292,7 @@ function continueMeasureFromResult(targetResultId) {
                             measureTooltipOverlay.setPosition(measurePointsArray[measurePointsArray.length - 1]);
                         }
                     }
-                    startMeasure2D();
+                    startMeasure2D(true);
                 }
             }
             break;
@@ -296,8 +300,11 @@ function continueMeasureFromResult(targetResultId) {
     }
 }
 
-function startMeasure2D() {
+function startMeasure2D(skipLineCreation) {
     if (!map) {
+        return;
+    }
+    if (!measureSource) {
         return;
     }
     if (measureClickEventHandler) {
@@ -319,18 +326,23 @@ function startMeasure2D() {
         mapElement.style.cursor = 'crosshair';
     }
     
-    const measureLineStyleObject = new ol.style.Style({
-        stroke: new ol.style.Stroke({
-            color: 'rgba(0, 0, 255, 0.6)',
-            width: 3
-        })
-    });
-    
-    measureCurrentLineFeature = new ol.Feature({
-        geometry: new ol.geom.LineString([])
-    });
-    measureCurrentLineFeature.setStyle(measureLineStyleObject);
-    measureSource.addFeature(measureCurrentLineFeature);
+    if (!skipLineCreation) {
+        if (measureCurrentLineFeature && measureSource) {
+            measureSource.removeFeature(measureCurrentLineFeature);
+        }
+        const measureLineStyleObject = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: 'rgba(0, 0, 255, 0.6)',
+                width: 3
+            })
+        });
+        
+        measureCurrentLineFeature = new ol.Feature({
+            geometry: new ol.geom.LineString([])
+        });
+        measureCurrentLineFeature.setStyle(measureLineStyleObject);
+        measureSource.addFeature(measureCurrentLineFeature);
+    }
 }
 
 function startMeasure3D() {
