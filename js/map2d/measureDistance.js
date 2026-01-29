@@ -156,7 +156,12 @@ function stopMeasure3DFunction() {
 
 function startMeasure() {
     if (isMeasuringNow) {
-        return;
+        if (is3DModeActive) {
+            stopMeasure3DFunction();
+        } else {
+            stopMeasure2DFunction();
+        }
+        isMeasuringNow = false;
     }
     
     isMeasuringNow = true;
@@ -174,7 +179,12 @@ function startMeasure() {
 
 function continueMeasureFromResult(targetResultId) {
     if (isMeasuringNow) {
-        return;
+        if (is3DModeActive) {
+            stopMeasure3DFunction();
+        } else {
+            stopMeasure2DFunction();
+        }
+        isMeasuringNow = false;
     }
     
     for (let searchIndex = 0; searchIndex < measureResultsArray.length; searchIndex = searchIndex + 1) {
@@ -245,7 +255,7 @@ function continueMeasureFromResult(targetResultId) {
                             }
                         });
                     }
-                    startMeasure3D();
+                    startMeasure3D(true);
                 } else {
                     if (!measureSource) {
                         isMeasuringNow = false;
@@ -327,8 +337,11 @@ function startMeasure2D(skipLineCreation) {
     }
     
     if (!skipLineCreation) {
-        if (measureCurrentLineFeature && measureSource) {
-            measureSource.removeFeature(measureCurrentLineFeature);
+         if (measureCurrentLineFeature) {
+            if (measureSource) {
+                measureSource.removeFeature(measureCurrentLineFeature);
+            }
+            measureCurrentLineFeature = null;
         }
         const measureLineStyleObject = new ol.style.Style({
             stroke: new ol.style.Stroke({
@@ -345,7 +358,7 @@ function startMeasure2D(skipLineCreation) {
     }
 }
 
-function startMeasure3D() {
+function startMeasure3D(skipEntityCreation) {
     if (cesiumViewer === null) {
         return;
     }
@@ -355,12 +368,21 @@ function startMeasure3D() {
         cesiumMeasureClickHandler = null;
     }
     
-    if (cesiumMeasurePolylineEntity) {
-        try {
-            cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
-        } catch (error) {
+    if (!skipEntityCreation) {
+        if (cesiumMeasurePolylineEntity) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasurePolylineEntity);
+            } catch (error) {
+            }
+            cesiumMeasurePolylineEntity = null;
         }
-        cesiumMeasurePolylineEntity = null;
+        if (cesiumMeasureTooltipLabel) {
+            try {
+                cesiumViewer.entities.remove(cesiumMeasureTooltipLabel);
+            } catch (error) {
+            }
+            cesiumMeasureTooltipLabel = null;
+        }
     }
     
     const cesiumCanvasElement = cesiumViewer.scene.canvas;
@@ -373,14 +395,16 @@ function startMeasure3D() {
         handleMeasureClick3DFunction(clickEvent);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     
-    cesiumMeasurePolylineEntity = cesiumViewer.entities.add({
-        polyline: {
-            positions: [],
-            width: 3,
-            material: Cesium.Color.BLUE.withAlpha(0.4),
-            clampToGround: true
-        }
-    });
+    if (!skipEntityCreation) {
+        cesiumMeasurePolylineEntity = cesiumViewer.entities.add({
+            polyline: {
+                positions: [],
+                width: 3,
+                material: Cesium.Color.BLUE.withAlpha(0.4),
+                clampToGround: true
+            }
+        });
+    }
 }
 
 function handleMeasureClickFunction(event) {
@@ -388,6 +412,9 @@ function handleMeasureClickFunction(event) {
         return;
     }
     if (!map) {
+        return;
+    }
+    if (!measureSource) {
         return;
     }
     
@@ -416,7 +443,9 @@ function handleMeasureClickFunction(event) {
         const calculatedDistance = formatLength(currentLineGeometry);
         displayText = calculatedDistance;
         
-        measureCurrentLineFeature.setGeometry(currentLineGeometry);
+        if (measureCurrentLineFeature) {
+            measureCurrentLineFeature.setGeometry(currentLineGeometry);
+        }
         if (measureTooltipOverlayElement) {
             measureTooltipOverlayElement.innerHTML = calculatedDistance;
             measureTooltipOverlay.setPosition(clickedCoordinate);
@@ -879,6 +908,9 @@ function goToMeasureEndPoint(targetResultId) {
 }
 
 function removeMeasureItem(targetResultId) {
+    if (!is3DModeActive && !measureSource) {
+        return;
+    }
     for (let searchIndex = 0; searchIndex < measureResultsArray.length; searchIndex = searchIndex + 1) {
         const currentItem = measureResultsArray[searchIndex];
         if (currentItem.id === targetResultId) {
@@ -890,6 +922,9 @@ function removeMeasureItem(targetResultId) {
                         }
                     }
                 } else {
+                    if (!measureSource) {
+                        return;
+                    }
                     if (currentItem.feature) {
                         measureSource.removeFeature(currentItem.feature);
                     }
@@ -981,6 +1016,9 @@ function removeMeasureItem(targetResultId) {
                             }
                         }
                     } else {
+                        if (!measureSource) {
+                            return;
+                        }
                         if (removedPointIndex < measurePointFeaturesArray.length) {
                             const removedFeature = measurePointFeaturesArray[removedPointIndex];
                             if (removedFeature) {
@@ -1068,6 +1106,9 @@ function removeMeasureItem(targetResultId) {
                             cesiumViewer.entities.remove(currentItem.feature);
                         }
                     } else {
+                        if (!measureSource) {
+                            return;
+                        }
                         measureSource.removeFeature(currentItem.feature);
                     }
                 }
@@ -1082,6 +1123,9 @@ function removeMeasureItem(targetResultId) {
                     }
                 }
                 if (currentItem.pointFeatures) {
+                    if (!measureSource) {
+                        return;
+                    }
                     for (let pointIndex = 0; pointIndex < currentItem.pointFeatures.length; pointIndex = pointIndex + 1) {
                         const currentPointFeature = currentItem.pointFeatures[pointIndex];
                         if (currentPointFeature) {
